@@ -99,6 +99,34 @@ Planned structure as the toolbox grows:
 2. Run it as a job so it gets queuing, progress, cancellation and cleanup for free.
 3. Give it its own page or section in the UI, reachable from a shared tool menu.
 
+## Development
+
+```sh
+npm run dev          # server with auto-reload
+npm run lint         # ESLint
+npm test             # Vitest (npm run test:watch to keep it running)
+```
+
+CI (GitHub Actions) runs lint and tests on every push to `main` and `development` and on pull requests.
+It sets `UMBRA_SKIP_SETUP=1` so `npm ci` does not download yt-dlp and ffmpeg.
+
+### Branches and commits
+
+- Work happens on `development`; `main` only ever points at released versions.
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org/), scoped by tool
+  (`feat(downloader): …`, `fix(gif): …`, `feat(core): …`). Release notes are drafted from `feat`, `fix` and `perf` commits.
+
+### Releasing
+
+```sh
+npm run release -- patch|minor|major ["Title"] [--dry-run]
+```
+
+From a clean `development` branch, the script runs lint and tests, bumps the version, commits and tags it
+(`1.0.0 · Title`), pushes, waits for CI on that commit, fast-forwards `main` to it and prints a link to a
+prefilled GitHub release to review and publish. `--dry-run` prints the steps without changing anything.
+Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
+
 ## Roadmap
 
 - [x] Media downloader (video, audio, mute)

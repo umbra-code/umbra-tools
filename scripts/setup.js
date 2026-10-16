@@ -1,5 +1,6 @@
 // Populates bin/ with yt-dlp, ffmpeg and ffprobe.
 // Usage: node scripts/setup.js [--force]   (--force re-downloads yt-dlp)
+// Set UMBRA_SKIP_SETUP=1 to skip it entirely (CI does not need the binaries).
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -50,6 +51,11 @@ function copyBinary(name, source) {
   fs.copyFileSync(source, target);
   fs.chmodSync(target, 0o755);
   console.log(`✓ ${name} ready`);
+}
+
+if (process.env.UMBRA_SKIP_SETUP) {
+  console.log('↷ UMBRA_SKIP_SETUP is set: skipping yt-dlp/ffmpeg setup');
+  process.exit(0);
 }
 
 fs.mkdirSync(bin, { recursive: true });

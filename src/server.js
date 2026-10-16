@@ -69,7 +69,7 @@ app.delete('/api/jobs/:id', (req, res) => {
   res.status(204).end();
 });
 
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   const status = err.status || (err.type === 'entity.parse.failed' ? 400 : 422);
   res.status(status).json({ error: err.message || 'Unexpected error' });
 });

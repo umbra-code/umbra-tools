@@ -23,7 +23,9 @@ function loadSettings() {
 function saveSettings() {
   try {
     localStorage.setItem('umbra-settings', JSON.stringify(state));
-  } catch {}
+  } catch {
+    // Storage can be unavailable (private mode, blocked site data); settings just won't persist.
+  }
 }
 
 // --- Options -------------------------------------------------------------------
@@ -149,7 +151,9 @@ async function poll(id) {
     } catch (err) {
       // fetch throws TypeError when the server is unreachable; tolerate brief outages.
       if (!(err instanceof TypeError)) throw err;
-      if (++networkErrors > 10) throw new Error('lost connection to the server; is it still running?');
+      if (++networkErrors > 10) {
+        throw new Error('lost connection to the server; is it still running?', { cause: err });
+      }
       setStatus('server unreachable, retrying…');
       await sleep(1500);
       continue;

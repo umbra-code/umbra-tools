@@ -12,11 +12,21 @@
     "setup": "node scripts/setup.js",
     "update-ytdlp": "node scripts/setup.js --force",
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "release": "node scripts/release.js"
   },
   "dependencies": {
     "express": "^5.1.0",
     "ffmpeg-static": "^5.2.0",
     "ffprobe-static": "^3.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "vitest": "^5.0.5"
   }
 }

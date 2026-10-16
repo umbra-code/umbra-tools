@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Tests do not need yt-dlp/ffmpeg; skip downloading them on install.
+      UMBRA_SKIP_SETUP: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # Retried once: downloads from the registry fail now and then.
+      - run: npm ci || npm ci
+      - run: npm run lint
+      - run: npm test
