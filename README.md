@@ -8,7 +8,7 @@ Everything runs on your machine, so files never leave it and there are no upload
 
 | Tool | Status | Description |
 |------|--------|-------------|
-| [Media downloader](#media-downloader) | ✅ available | Download video or audio from YouTube and [a thousand other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) |
+| [Media downloader](#media-downloader) | ✅ available | Save video or audio from a link, on any [site supported by yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) |
 | Video → GIF | 🗺️ planned | Turn a clip (or a time range of it) into a GIF or animated WebP |
 | Video converter | 🗺️ planned | Change container/codec, resolution or bitrate; trim and compress |
 | Audio converter | 🗺️ planned | Convert between mp3, m4a, opus, wav, flac…; extract audio from video |
@@ -51,13 +51,13 @@ for downloading and ffmpeg for merging and converting.
 
 - mp3, m4a, opus and flac files include metadata and cover art.
 - Video and audio streams are merged without re-encoding, so you get exactly what the site serves.
-- YouTube only serves 1440p and 4K as VP9 or AV1 (H.264 tops out at 1080p). A 1440p+ mp4 therefore
-  contains VP9 video, which plays fine in browsers and VLC but may not open in older editors.
-- If YouTube answers `403 Forbidden`, the job retries, first unchanged and then as other YouTube clients.
+- Some sites only serve high resolutions (1440p, 4K) as VP9 or AV1. An mp4 at those resolutions may then
+  contain VP9 video, which plays fine in browsers and VLC but may not open in older editors.
+- If a site answers `403 Forbidden`, the job retries, first unchanged and then with alternative clients.
   Retries are pinned to the format chosen by the first attempt, so a retry never silently downgrades quality.
 - Playlists are not supported yet.
 
-**Maintenance:** YouTube changes often and yt-dlp is updated to keep up. If downloads start failing:
+**Maintenance:** sites change often and yt-dlp is updated to keep up. If downloads start failing:
 
 ```sh
 npm run update-ytdlp
