@@ -1,0 +1,22 @@
+{
+  "name": "umbra-tools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local web video and audio downloader (YouTube and more) built on yt-dlp + ffmpeg",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "postinstall": "node scripts/setup.js",
+    "setup": "node scripts/setup.js",
+    "update-ytdlp": "node scripts/setup.js --force",
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0"
+  }
+}

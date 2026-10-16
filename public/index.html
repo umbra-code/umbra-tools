@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>umbra tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬇</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>umbra<span>tools</span></h1>
+      <p class="tagline">download video and audio from youtube and a thousand other sites</p>
+    </header>
+
+    <form id="form" autocomplete="off">
+      <div class="input-row">
+        <input id="url" type="url" placeholder="paste the link here" required aria-label="Link">
+        <button type="button" id="paste" class="ghost" title="Paste from clipboard">paste</button>
+        <button type="submit" id="go" aria-label="Download">⬇</button>
+      </div>
+
+      <div class="group" data-key="mode" role="group" aria-label="Mode">
+        <button type="button" data-value="video">🎬 video</button>
+        <button type="button" data-value="audio">🎵 audio</button>
+        <button type="button" data-value="mute">🔇 mute</button>
+      </div>
+
+      <div id="video-options" class="options">
+        <label>format
+          <div class="group" data-key="videoFormat">
+            <button type="button" data-value="mp4">mp4</button>
+            <button type="button" data-value="webm">webm</button>
+            <button type="button" data-value="mkv">mkv</button>
+          </div>
+        </label>
+        <label>quality
+          <div class="group" data-key="quality">
+            <button type="button" data-value="max">max</button>
+            <button type="button" data-value="2160">4k</button>
+            <button type="button" data-value="1440">1440p</button>
+            <button type="button" data-value="1080">1080p</button>
+            <button type="button" data-value="720">720p</button>
+            <button type="button" data-value="480">480p</button>
+            <button type="button" data-value="360">360p</button>
+          </div>
+        </label>
+      </div>
+
+      <div id="audio-options" class="options">
+        <label>format
+          <div class="group" data-key="audioFormat">
+            <button type="button" data-value="mp3">mp3</button>
+            <button type="button" data-value="m4a">m4a</button>
+            <button type="button" data-value="opus">opus</button>
+            <button type="button" data-value="ogg">ogg</button>
+            <button type="button" data-value="wav">wav</button>
+            <button type="button" data-value="flac">flac</button>
+            <button type="button" data-value="original" title="No re-encoding">original</button>
+          </div>
+        </label>
+        <label id="bitrate-label">bitrate
+          <div class="group" data-key="audioBitrate">
+            <button type="button" data-value="320">320k</button>
+            <button type="button" data-value="256">256k</button>
+            <button type="button" data-value="192">192k</button>
+            <button type="button" data-value="128">128k</button>
+            <button type="button" data-value="96">96k</button>
+          </div>
+        </label>
+      </div>
+    </form>
+
+    <section id="result" hidden>
+      <div id="preview" class="preview" hidden>
+        <img id="thumb" alt="">
+        <div>
+          <p id="title" class="title"></p>
+          <p id="meta" class="meta"></p>
+        </div>
+      </div>
+      <div class="status">
+        <div class="bar"><div id="bar-fill"></div></div>
+        <div class="status-row">
+          <span id="status-text"></span>
+          <span class="actions">
+            <a id="again" hidden>download again</a>
+            <button type="button" id="cancel" class="ghost small" hidden>cancel</button>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      personal use · respect copyright and each site's terms
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

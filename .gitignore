@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Binaries downloaded by scripts/setup.js (yt-dlp, ffmpeg, ffprobe)
+bin/
+
+# Stray yt-dlp downloads, in case it is run by hand inside the project
+*.part
+*.ytdl
+*.mp4
+*.webm
+*.mkv
+*.mp3
+*.m4a
+*.opus
+*.ogg
+*.wav
+*.flac
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+.env.*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
