@@ -7,7 +7,9 @@
 // The optional title goes into the version commit, the tag and the release
 // ("1.0.0 · Media Downloader"); it is asked for when not given.
 //
-// Set GITHUB_TOKEN to raise the GitHub API rate limit while waiting for CI.
+// The GitHub API is used to wait for CI. Private repositories need a token: set
+// GITHUB_TOKEN (Actions: read) or log in with the GitHub CLI (`gh auth login`).
+// On public ones a token is optional and only raises the rate limit.
 
 import { execFileSync, execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -38,13 +40,47 @@ if (!['patch', 'minor', 'major'].includes(bump)) {
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const step = (title) => console.log(`\n→ ${title}`);
 
-/** Like `git`, but returns null instead of throwing (e.g. no tags or no upstream yet). */
-const tryGit = (...args) => {
+/** Runs a command and returns its output, or null when it fails or does not exist. */
+const tryExec = (command, ...args) => {
   try {
-    return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null;
   } catch {
     return null;
   }
+};
+
+/** Like `git`, but returns null instead of throwing (e.g. no tags or no upstream yet). */
+const tryGit = (...args) => tryExec('git', ...args);
+
+const githubHeaders = () => {
+  const headers = { Accept: 'application/vnd.github+json' };
+  const token = process.env.GITHUB_TOKEN || tryExec('gh', 'auth', 'token');
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+};
+
+/**
+ * Fails before anything is versioned when the GitHub API cannot see the repository:
+ * otherwise the release would get stuck waiting for CI after tagging.
+ */
+const checkGithubAccess = async (repo) => {
+  let response;
+  try {
+    response = await fetch(`https://api.github.com/repos/${repo}`, { headers: githubHeaders() });
+  } catch {
+    fail('Could not reach the GitHub API. Check your connection and try again.');
+  }
+  if (response.ok) return;
+  if ([401, 403, 404].includes(response.status)) {
+    fail(
+      [
+        `The GitHub API cannot access ${repo} (HTTP ${response.status}), so CI could not be checked.`,
+        '  The repository is probably private: set GITHUB_TOKEN to a token with "Actions: read"',
+        '  access to it, or log in with the GitHub CLI (gh auth login).',
+      ].join('\n'),
+    );
+  }
+  fail(`The GitHub API returned ${response.status}. Try again in a moment.`);
 };
 
 /** Runs a command that changes something; only printed in a dry run. */
@@ -87,8 +123,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * run, so calling this again after one picks up the new attempt.
  */
 const waitForCi = async (repo, sha) => {
-  const headers = { Accept: 'application/vnd.github+json' };
-  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const headers = githubHeaders();
   const url = `https://api.github.com/repos/${repo}/actions/runs?head_sha=${sha}&event=push&branch=${DEVELOP}`;
   const deadline = Date.now() + CI_TIMEOUT_MS;
 
@@ -132,6 +167,7 @@ if (!tryGit('rev-parse', '--abbrev-ref', '@{upstream}')) {
   fail(`${DEVELOP} is not on GitHub yet. Push it once with: git push -u origin ${DEVELOP}`);
 }
 const repo = githubRepo();
+await checkGithubAccess(repo);
 
 run('git pull --ff-only');
 const current = JSON.parse(readFileSync('package.json', 'utf8')).version;
