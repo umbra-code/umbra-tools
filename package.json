@@ -1,6 +1,6 @@
 {
   "name": "umbra-tools",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Local web video and audio downloader (YouTube and more) built on yt-dlp + ffmpeg",
   "type": "module",
