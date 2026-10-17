@@ -1,55 +1,60 @@
-import express from 'express';
+import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { getInfo, sanitizeOptions, OPTIONS, DEFAULTS } from './ytdlp.js';
-import { createJob, getJob, cancelJob, publicJob, shutdown } from './jobs.js';
+import express from 'express';
+import multer from 'multer';
+import { ROOT, UPLOAD_DIR } from './core/paths.js';
+import { httpError } from './core/errors.js';
+import { parseSource, parseUrl } from './core/input.js';
+import { cancelJob, createJob, getJob, initTempDir, publicJob, shutdown } from './core/jobs.js';
+import { tools } from './tools/index.js';
+import { getInfo } from './tools/downloader/ytdlp.js';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
+const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 2048;
+
+initTempDir();
+
+const upload = multer({
+  dest: UPLOAD_DIR,
+  limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 },
+});
 
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '10kb' }));
-app.use(express.static(path.join(root, 'public')));
-
-function parseUrl(value) {
-  const err = new Error('Enter a valid link (http or https)');
-  err.status = 400;
-  if (typeof value !== 'string' || value.length > 2048) throw err;
-  let url;
-  try {
-    url = new URL(value.trim());
-  } catch {
-    throw err;
-  }
-  if (!['http:', 'https:'].includes(url.protocol)) throw err;
-  return url.href;
-}
+app.use(express.static(path.join(ROOT, 'public')));
 
 function findJob(req) {
   const job = getJob(req.params.id);
-  if (!job) {
-    const err = new Error('Download not found or expired');
-    err.status = 404;
-    throw err;
-  }
+  if (!job) throw httpError(404, 'Job not found or expired');
   return job;
 }
 
-app.get('/api/options', (req, res) => {
-  res.json({ options: OPTIONS, defaults: DEFAULTS });
-});
+/** busboy decodes multipart file names as latin1; browsers send UTF-8. */
+const decodeFileName = (name) => Buffer.from(name, 'latin1').toString('utf8');
 
 app.post('/api/info', async (req, res) => {
-  const url = parseUrl(req.body?.url);
-  res.json(await getInfo(url));
+  res.json(await getInfo(parseUrl(req.body?.url)));
 });
 
-app.post('/api/jobs', (req, res) => {
-  const url = parseUrl(req.body?.url);
-  const job = createJob(url, sanitizeOptions(req.body));
-  res.status(201).json(publicJob(job));
+// JSON with a `url`, or multipart with a `file`. Without `tool` it is the downloader,
+// as in v1.0.
+app.post('/api/jobs', upload.single('file'), (req, res) => {
+  try {
+    const tool = tools[req.body?.tool || 'downloader'];
+    if (!tool) throw httpError(400, 'Unknown tool');
+    if (req.file) req.file.originalname = decodeFileName(req.file.originalname);
+
+    const job = createJob(tool, {
+      ...parseSource(req.body, req.file, tool.accepts),
+      options: tool.parseOptions(req.body ?? {}),
+    });
+    res.status(201).json(publicJob(job));
+  } catch (err) {
+    if (req.file) fs.rm(req.file.path, { force: true }, () => {});
+    throw err;
+  }
 });
 
 app.get('/api/jobs/:id', (req, res) => {
@@ -58,9 +63,7 @@ app.get('/api/jobs/:id', (req, res) => {
 
 app.get('/api/jobs/:id/file', (req, res) => {
   const job = findJob(req);
-  if (job.status !== 'done') {
-    return res.status(409).json({ error: 'The file is not ready yet' });
-  }
+  if (job.status !== 'done') throw httpError(409, 'The file is not ready yet');
   res.download(job.file, path.basename(job.file));
 });
 
@@ -70,6 +73,10 @@ app.delete('/api/jobs/:id', (req, res) => {
 });
 
 app.use((err, req, res, _next) => {
+  if (err instanceof multer.MulterError) {
+    const tooBig = err.code === 'LIMIT_FILE_SIZE';
+    err = httpError(tooBig ? 413 : 400, tooBig ? `Files can be at most ${MAX_UPLOAD_MB} MB` : err.message);
+  }
   const status = err.status || (err.type === 'entity.parse.failed' ? 400 : 422);
   res.status(status).json({ error: err.message || 'Unexpected error' });
 });

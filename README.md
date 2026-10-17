@@ -9,7 +9,7 @@ Everything runs on your machine, so files never leave it and there are no upload
 | Tool | Status | Description |
 |------|--------|-------------|
 | [Media downloader](#media-downloader) | ✅ available | Save video or audio from a link, on any [site supported by yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) |
-| Video → GIF | 🗺️ planned | Turn a clip (or a time range of it) into a GIF or animated WebP |
+| [Video → GIF](#video--gif) | ✅ available | Turn a time range of a video file or link into a GIF or animated WebP |
 | Video converter | 🗺️ planned | Change container/codec, resolution or bitrate; trim and compress |
 | Audio converter | 🗺️ planned | Convert between mp3, m4a, opus, wav, flac…; extract audio from video |
 | Image converter | 🗺️ planned | Convert between png, jpg, webp, avif…; resize and compress |
@@ -34,6 +34,8 @@ npm start     # open http://localhost:3000
 | `HOST`                     | `127.0.0.1` | Use `0.0.0.0` to reach it from other devices on your network |
 | `MAX_CONCURRENT`           | `2`         | Jobs that run at the same time                      |
 | `FILE_TTL_MINUTES`         | `15`        | How long finished files are kept                    |
+| `MAX_UPLOAD_MB`            | `2048`      | Largest file that can be uploaded                   |
+| `GIF_MAX_SECONDS`          | `60`        | Longest clip Video → GIF accepts                    |
 | `YTDLP_PATH`, `FFMPEG_DIR` | `bin/`      | Use your own binaries                               |
 
 ---
@@ -65,39 +67,72 @@ npm run update-ytdlp
 
 ---
 
+## Video → GIF
+
+Pick a video file (drag and drop works) or paste a link, choose the time range and get a looping
+GIF or animated WebP. Built on ffmpeg.
+
+| Option | Values                       | Notes                                              |
+|--------|------------------------------|----------------------------------------------------|
+| range  | start and end                | `83`, `1:23`, `1:23.5` or `1:02:03`; up to 60 s     |
+| fps    | 10, 15, 20, 25, 30           |                                                    |
+| width  | 320, 480, 640, 800, 1080     | Smaller videos are never upscaled                  |
+| format | gif, webp                    | WebP is smaller with full color; not every app opens it |
+
+- For files, a player lets you set the start and end from the current playback position.
+- For links, only the selected range is downloaded, cut on exact frames.
+- GIFs use a palette built from the clip itself, which gives far better colors than the default one.
+
+---
+
 ## Architecture
 
 The app is a small Express server plus a dependency-free frontend. Long-running work runs as
-**jobs**: the client creates a job, polls its progress and fetches the result when it is done.
-The downloader is the first tool built on this; new tools are meant to reuse the same pieces.
+**jobs**: the client creates a job (with a link or an uploaded file), polls its progress and fetches
+the result when it is done. Every tool is a job runner on top of the same core.
 
 ```
-src/server.js     HTTP API (Express) + static files
-src/jobs.js       job queue, progress tracking, temp file cleanup
-src/ytdlp.js      media downloader: yt-dlp calls and format → argument mapping
-public/           UI (plain HTML/CSS/JS)
-scripts/setup.js  downloads yt-dlp and copies ffmpeg/ffprobe into bin/
+src/server.js            HTTP API (Express) + static files
+src/core/                shared by every tool
+  jobs.js                job queue, progress, cancellation, temp file cleanup
+  input.js               option allowlists, links and uploaded files
+  process.js             child processes (line-by-line output, killing process trees)
+  files.js, time.js      file names, time parsing
+  paths.js               binaries and temp locations
+src/tools/               one folder per tool
+  index.js               tool registry
+  downloader/            media downloader; ytdlp.js is reused by tools that accept links
+  gif/                   video → GIF
+public/                  UI (plain HTML/CSS/JS modules)
+  js/main.js             tool menu
+  js/tools/<tool>.js     one module per tool
+scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
 ```
 
-- Each job works in its own temp folder under `<os temp>/umbra-tools`. Finished files are removed after
-  `FILE_TTL_MINUTES`, and the whole folder is wiped on startup.
+- Each job works in its own temp folder under `<os temp>/umbra-tools` (`input/`, `work/`, `out/`).
+  Finished files are removed after `FILE_TTL_MINUTES`, and the whole folder is wiped on startup.
 - Binaries live in `bin/` (git-ignored) and are fetched by `npm install`.
 
-### API (media downloader)
+### API
 
-- `POST /api/info` `{ url }` → title, uploader, duration, thumbnail and available resolutions
-- `POST /api/jobs` `{ url, mode, videoFormat, quality, audioFormat, audioBitrate }` → creates a download
-- `GET /api/jobs/:id` → status and progress
+- `POST /api/jobs` → creates a job and returns its state. Send JSON with a `url`, or multipart with a `file`,
+  plus `tool` (`downloader` by default) and the tool's options:
+  - `downloader`: `mode`, `videoFormat`, `quality`, `audioFormat`, `audioBitrate`
+  - `gif`: `start`, `end`, `fps`, `width`, `format`
+- `GET /api/jobs/:id` → `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage` and `progress`
 - `GET /api/jobs/:id/file` → the finished file
 - `DELETE /api/jobs/:id` → cancels the job
+- `POST /api/info` `{ url }` → title, uploader, duration, thumbnail and available resolutions of a link
 
 ### Adding a tool
 
-Planned structure as the toolbox grows:
-
-1. Put the tool's logic in its own module under `src/tools/<tool>/` (argument building, validation).
-2. Run it as a job so it gets queuing, progress, cancellation and cleanup for free.
-3. Give it its own page or section in the UI, reachable from a shared tool menu.
+1. Create `src/tools/<tool>/index.js` exporting `{ id, accepts, parseOptions(body), run(ctx) }`:
+   - `accepts`: `['url']`, `['file']` or both.
+   - `parseOptions` validates the request (use `pickAllowed` for allowlists; throw `httpError(400, …)`).
+   - `run(ctx)` writes its result into `ctx.outDir`, using `ctx.run()` for processes (so cancelling kills them)
+     and `ctx.stage()` / `ctx.progress()` to report progress. Intermediate files go in `ctx.workDir`.
+2. Register it in `src/tools/index.js`.
+3. Add a tab and a section in `public/index.html`, and its module in `public/js/tools/`, registered in `public/js/main.js`.
 
 ## Development
 
@@ -130,9 +165,9 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 ## Roadmap
 
 - [x] Media downloader (video, audio, mute)
-- [ ] Generalize jobs so they are not tied to yt-dlp (file uploads as job input)
-- [ ] Tool menu / navigation in the UI
-- [ ] Video → GIF / animated WebP
+- [x] Generalize jobs so they are not tied to yt-dlp (file uploads as job input)
+- [x] Tool menu / navigation in the UI
+- [x] Video → GIF / animated WebP
 - [ ] Video converter (trim, compress, change codec/resolution)
 - [ ] Audio converter
 - [ ] Image converter

@@ -11,91 +11,172 @@
   <main>
     <header>
       <h1>umbra<span>tools</span></h1>
-      <p class="tagline">download video and audio from youtube and a thousand other sites</p>
+      <p class="tagline">local tools for media and files</p>
     </header>
 
-    <form id="form" autocomplete="off">
-      <div class="input-row">
-        <input id="url" type="url" placeholder="paste the link here" required aria-label="Link">
-        <button type="button" id="paste" class="ghost" title="Paste from clipboard">paste</button>
-        <button type="submit" id="go" aria-label="Download">⬇</button>
-      </div>
+    <nav class="tabs" role="tablist" aria-label="Tools">
+      <button type="button" role="tab" data-tool="downloader">⬇ downloader</button>
+      <button type="button" role="tab" data-tool="gif">🎞 video → gif</button>
+    </nav>
 
-      <div class="group" data-key="mode" role="group" aria-label="Mode">
-        <button type="button" data-value="video">🎬 video</button>
-        <button type="button" data-value="audio">🎵 audio</button>
-        <button type="button" data-value="mute">🔇 mute</button>
-      </div>
-
-      <div id="video-options" class="options">
-        <label>format
-          <div class="group" data-key="videoFormat">
-            <button type="button" data-value="mp4">mp4</button>
-            <button type="button" data-value="webm">webm</button>
-            <button type="button" data-value="mkv">mkv</button>
-          </div>
-        </label>
-        <label>quality
-          <div class="group" data-key="quality">
-            <button type="button" data-value="max">max</button>
-            <button type="button" data-value="2160">4k</button>
-            <button type="button" data-value="1440">1440p</button>
-            <button type="button" data-value="1080">1080p</button>
-            <button type="button" data-value="720">720p</button>
-            <button type="button" data-value="480">480p</button>
-            <button type="button" data-value="360">360p</button>
-          </div>
-        </label>
-      </div>
-
-      <div id="audio-options" class="options">
-        <label>format
-          <div class="group" data-key="audioFormat">
-            <button type="button" data-value="mp3">mp3</button>
-            <button type="button" data-value="m4a">m4a</button>
-            <button type="button" data-value="opus">opus</button>
-            <button type="button" data-value="ogg">ogg</button>
-            <button type="button" data-value="wav">wav</button>
-            <button type="button" data-value="flac">flac</button>
-            <button type="button" data-value="original" title="No re-encoding">original</button>
-          </div>
-        </label>
-        <label id="bitrate-label">bitrate
-          <div class="group" data-key="audioBitrate">
-            <button type="button" data-value="320">320k</button>
-            <button type="button" data-value="256">256k</button>
-            <button type="button" data-value="192">192k</button>
-            <button type="button" data-value="128">128k</button>
-            <button type="button" data-value="96">96k</button>
-          </div>
-        </label>
-      </div>
-    </form>
-
-    <section id="result" hidden>
-      <div id="preview" class="preview" hidden>
-        <img id="thumb" alt="">
-        <div>
-          <p id="title" class="title"></p>
-          <p id="meta" class="meta"></p>
+    <!-- Media downloader -->
+    <section id="tool-downloader" class="tool" role="tabpanel" hidden>
+      <form autocomplete="off">
+        <div class="input-row">
+          <input name="url" type="url" placeholder="paste the link here" required aria-label="Link">
+          <button type="button" class="ghost" data-paste title="Paste from clipboard">paste</button>
+          <button type="submit" class="go" aria-label="Download">⬇</button>
         </div>
-      </div>
-      <div class="status">
-        <div class="bar"><div id="bar-fill"></div></div>
-        <div class="status-row">
-          <span id="status-text"></span>
-          <span class="actions">
-            <a id="again" hidden>download again</a>
-            <button type="button" id="cancel" class="ghost small" hidden>cancel</button>
-          </span>
+
+        <div class="group" data-key="mode" role="group" aria-label="Mode">
+          <button type="button" data-value="video">🎬 video</button>
+          <button type="button" data-value="audio">🎵 audio</button>
+          <button type="button" data-value="mute">🔇 mute</button>
         </div>
-      </div>
+
+        <div class="options" data-show-when="mode!=audio">
+          <label>format
+            <div class="group" data-key="videoFormat">
+              <button type="button" data-value="mp4">mp4</button>
+              <button type="button" data-value="webm">webm</button>
+              <button type="button" data-value="mkv">mkv</button>
+            </div>
+          </label>
+          <label>quality
+            <div class="group" data-key="quality">
+              <button type="button" data-value="max">max</button>
+              <button type="button" data-value="2160">4k</button>
+              <button type="button" data-value="1440">1440p</button>
+              <button type="button" data-value="1080">1080p</button>
+              <button type="button" data-value="720">720p</button>
+              <button type="button" data-value="480">480p</button>
+              <button type="button" data-value="360">360p</button>
+            </div>
+          </label>
+        </div>
+
+        <div class="options" data-show-when="mode=audio">
+          <label>format
+            <div class="group" data-key="audioFormat">
+              <button type="button" data-value="mp3">mp3</button>
+              <button type="button" data-value="m4a">m4a</button>
+              <button type="button" data-value="opus">opus</button>
+              <button type="button" data-value="ogg">ogg</button>
+              <button type="button" data-value="wav">wav</button>
+              <button type="button" data-value="flac">flac</button>
+              <button type="button" data-value="original" title="No re-encoding">original</button>
+            </div>
+          </label>
+          <label data-show-when="audioFormat!=wav,flac,original">bitrate
+            <div class="group" data-key="audioBitrate">
+              <button type="button" data-value="320">320k</button>
+              <button type="button" data-value="256">256k</button>
+              <button type="button" data-value="192">192k</button>
+              <button type="button" data-value="128">128k</button>
+              <button type="button" data-value="96">96k</button>
+            </div>
+          </label>
+        </div>
+      </form>
+      <div class="result-slot"></div>
     </section>
+
+    <!-- Video → GIF -->
+    <section id="tool-gif" class="tool" role="tabpanel" hidden>
+      <form autocomplete="off">
+        <div class="group" data-key="source" role="group" aria-label="Source">
+          <button type="button" data-value="file">📁 file</button>
+          <button type="button" data-value="url">🔗 link</button>
+        </div>
+
+        <div class="input-row" data-show-when="source=url">
+          <input name="url" type="url" placeholder="paste the link here" aria-label="Link">
+          <button type="button" class="ghost" data-paste title="Paste from clipboard">paste</button>
+        </div>
+
+        <div data-show-when="source=file">
+          <label class="dropzone" data-dropzone>
+            <input name="file" type="file" accept="video/*" hidden>
+            <span data-file-label>drop a video here or click to choose one</span>
+          </label>
+          <video data-player controls muted playsinline hidden></video>
+        </div>
+
+        <div class="range">
+          <label>start
+            <span class="time-input">
+              <input name="start" value="0:00" inputmode="decimal" aria-label="Start time" required>
+              <button type="button" class="ghost small" data-mark="start" title="Use the player's current time" hidden>⏱ now</button>
+            </span>
+          </label>
+          <label>end
+            <span class="time-input">
+              <input name="end" value="0:05" inputmode="decimal" aria-label="End time" required>
+              <button type="button" class="ghost small" data-mark="end" title="Use the player's current time" hidden>⏱ now</button>
+            </span>
+          </label>
+          <span class="hint" data-length></span>
+        </div>
+
+        <div class="options">
+          <label>fps
+            <div class="group" data-key="fps">
+              <button type="button" data-value="10">10</button>
+              <button type="button" data-value="15">15</button>
+              <button type="button" data-value="20">20</button>
+              <button type="button" data-value="25">25</button>
+              <button type="button" data-value="30">30</button>
+            </div>
+          </label>
+          <label>width
+            <div class="group" data-key="width">
+              <button type="button" data-value="320">320</button>
+              <button type="button" data-value="480">480</button>
+              <button type="button" data-value="640">640</button>
+              <button type="button" data-value="800">800</button>
+              <button type="button" data-value="1080">1080</button>
+            </div>
+          </label>
+          <label>format
+            <div class="group" data-key="format">
+              <button type="button" data-value="gif">gif</button>
+              <button type="button" data-value="webp" title="Smaller and with full color; not every app can open it">webp</button>
+            </div>
+          </label>
+        </div>
+
+        <button type="submit" class="go wide">create</button>
+      </form>
+      <div class="result-slot"></div>
+    </section>
+
+    <template id="result-template">
+      <section class="result" hidden>
+        <div class="preview" hidden>
+          <img class="thumb" alt="">
+          <div>
+            <p class="title"></p>
+            <p class="meta"></p>
+          </div>
+        </div>
+        <img class="output" alt="Result preview" hidden>
+        <div class="status">
+          <div class="bar"><div class="bar-fill"></div></div>
+          <div class="status-row">
+            <span class="status-text"></span>
+            <span class="actions">
+              <a class="again" hidden>download</a>
+              <button type="button" class="ghost small cancel" hidden>cancel</button>
+            </span>
+          </div>
+        </div>
+      </section>
+    </template>
 
     <footer>
       personal use · respect copyright and each site's terms
     </footer>
   </main>
-  <script src="app.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>

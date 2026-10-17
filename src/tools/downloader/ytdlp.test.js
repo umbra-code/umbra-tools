@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildDownloadArgs, cleanError, DEFAULTS, isForbidden, sanitizeOptions } from './ytdlp.js';
+import { buildDownloadArgs, cleanError, DEFAULTS, formatArgs, isForbidden, sanitizeOptions } from './ytdlp.js';
 
 const URL = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
 
 /** Value that follows the last occurrence of `flag`, as yt-dlp would read it. */
 const lastValue = (args, flag) => args[args.lastIndexOf(flag) + 1];
 
-const argsFor = (options, extra, pinned) =>
-  buildDownloadArgs(URL, '/tmp/job', sanitizeOptions(options), extra, pinned);
+const argsFor = (options, { client, pinned, extra } = {}) =>
+  buildDownloadArgs(URL, '/tmp/job', { client, extra, pinned, format: formatArgs(sanitizeOptions(options)) });
 
 describe('sanitizeOptions', () => {
   it('keeps allowed values', () => {
@@ -27,15 +27,32 @@ describe('sanitizeOptions', () => {
 
 describe('buildDownloadArgs', () => {
   it('always ends with the URL after "--" so it cannot be read as an option', () => {
-    const args = argsFor({});
-    expect(args.slice(-2)).toEqual(['--', URL]);
+    expect(argsFor({}).slice(-2)).toEqual(['--', URL]);
   });
 
-  it('puts extra arguments first', () => {
-    const extra = ['--extractor-args', 'youtube:player_client=tv'];
-    expect(argsFor({}, extra).slice(0, 2)).toEqual(extra);
+  it('puts the retry client first', () => {
+    const client = ['--extractor-args', 'youtube:player_client=tv'];
+    expect(argsFor({}, { client }).slice(0, 2)).toEqual(client);
   });
 
+  it('adds extra arguments before the URL', () => {
+    const args = argsFor({}, { extra: ['--download-sections', '*5-10'] });
+    expect(lastValue(args, '--download-sections')).toBe('*5-10');
+    expect(args.indexOf('--download-sections')).toBeLessThan(args.indexOf('--'));
+  });
+
+  it('pins the format picked by the first attempt, overriding the selection', () => {
+    const args = argsFor({ quality: '1440' }, { pinned: '308+140-3' });
+    expect(lastValue(args, '-f')).toBe('308+140-3/308+ba');
+    expect(args.lastIndexOf('-f')).toBeGreaterThan(args.indexOf('-S'));
+  });
+
+  it('pins a single combined format as is', () => {
+    expect(lastValue(argsFor({}, { pinned: '18' }), '-f')).toBe('18');
+  });
+});
+
+describe('formatArgs', () => {
   it('caps the resolution and prefers H.264/AAC for mp4', () => {
     const args = argsFor({ mode: 'video', videoFormat: 'mp4', quality: '1080' });
     expect(lastValue(args, '-f')).toBe('bv*+ba/b');
@@ -74,16 +91,6 @@ describe('buildDownloadArgs', () => {
 
   it('maps ogg to the vorbis codec', () => {
     expect(lastValue(argsFor({ mode: 'audio', audioFormat: 'ogg' }), '--audio-format')).toBe('vorbis');
-  });
-
-  it('pins the format picked by the first attempt, overriding the selection', () => {
-    const args = argsFor({ quality: '1440' }, [], '308+140-3');
-    expect(lastValue(args, '-f')).toBe('308+140-3/308+ba');
-    expect(args.lastIndexOf('-f')).toBeGreaterThan(args.indexOf('-S'));
-  });
-
-  it('pins a single combined format as is', () => {
-    expect(lastValue(argsFor({}, [], '18'), '-f')).toBe('18');
   });
 });
 

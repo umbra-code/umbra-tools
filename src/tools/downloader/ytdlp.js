@@ -1,23 +1,19 @@
-// Thin wrapper around the yt-dlp binary: metadata lookup and argument building.
-import { spawn, execFile } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BIN = path.join(root, 'bin');
-const EXE = process.platform === 'win32' ? '.exe' : '';
-
-export const YTDLP = process.env.YTDLP_PATH || path.join(BIN, `yt-dlp${EXE}`);
-const FFMPEG_DIR = process.env.FFMPEG_DIR || BIN;
+// yt-dlp integration: metadata lookup, argument building and downloads with retries.
+// Used by the downloader and by any tool that accepts a link (e.g. video → GIF).
+import { BINARIES } from '../../core/paths.js';
+import { pickAllowed } from '../../core/input.js';
+import { killTree, runProcess } from '../../core/process.js';
 
 const BASE_ARGS = [
   '--ignore-config',
   '--no-playlist',
   '--no-warnings',
-  '--ffmpeg-location', FFMPEG_DIR,
+  '--ffmpeg-location', BINARIES.ffmpegDir,
   // YouTube needs a JS runtime to solve its challenges; reuse the running Node.
   '--js-runtimes', `node:${process.execPath}`,
 ];
+
+const ENV = { PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' };
 
 export const OPTIONS = {
   mode: ['video', 'audio', 'mute'],
@@ -36,31 +32,7 @@ export const DEFAULTS = {
 };
 
 /** Validates client options against the allowlist, falling back to defaults. */
-export function sanitizeOptions(input = {}) {
-  const out = {};
-  for (const [key, allowed] of Object.entries(OPTIONS)) {
-    const value = String(input[key] ?? '');
-    out[key] = allowed.includes(value) ? value : DEFAULTS[key];
-  }
-  return out;
-}
-
-export function spawnYtdlp(args) {
-  return spawn(YTDLP, [...BASE_ARGS, ...args], {
-    windowsHide: true,
-    env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
-  });
-}
-
-/** Kills the process and its children (ffmpeg), on Windows too. */
-export function killTree(child) {
-  if (!child || child.exitCode !== null) return;
-  if (process.platform === 'win32') {
-    execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], () => {});
-  } else {
-    child.kill('SIGKILL');
-  }
-}
+export const sanitizeOptions = (input = {}) => pickAllowed(input, OPTIONS, DEFAULTS);
 
 /** Extracts a readable message from yt-dlp's stderr. */
 export function cleanError(stderr) {
@@ -72,36 +44,32 @@ export function cleanError(stderr) {
     .slice(0, 300);
 }
 
-function run(args, timeoutMs = 60_000) {
-  return new Promise((resolve, reject) => {
-    const child = spawnYtdlp(args);
-    let out = '';
-    let err = '';
-    let settled = false;
-    const done = (fn, value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      fn(value);
-    };
-    const timer = setTimeout(() => {
-      killTree(child);
-      done(reject, new Error('Request timed out'));
-    }, timeoutMs);
+export async function getInfo(url, timeoutMs = 60_000) {
+  let child;
+  let timedOut = false;
+  const lines = [];
+  const timer = setTimeout(() => {
+    timedOut = true;
+    killTree(child);
+  }, timeoutMs);
 
-    child.stdout.setEncoding('utf8').on('data', (d) => (out += d));
-    child.stderr.setEncoding('utf8').on('data', (d) => (err += d));
-    child.on('error', (e) =>
-      done(reject, e.code === 'ENOENT' ? new Error('yt-dlp is not installed: run "npm run setup"') : e),
-    );
-    child.on('close', (code) =>
-      code === 0 ? done(resolve, out) : done(reject, new Error(cleanError(err))),
-    );
-  });
-}
+  let result;
+  try {
+    result = await runProcess(BINARIES.ytdlp, [...BASE_ARGS, '-J', '--flat-playlist', '--', url], {
+      env: ENV,
+      track: (c) => (child = c),
+      onLine: (line) => lines.push(line),
+    });
+  } catch (err) {
+    if (err.code === 'ENOENT') throw new Error('yt-dlp is not installed: run "npm run setup"', { cause: err });
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (timedOut) throw new Error('Request timed out');
+  if (result.code !== 0) throw new Error(cleanError(result.stderr));
 
-export async function getInfo(url) {
-  const info = JSON.parse(await run(['-J', '--flat-playlist', '--', url]));
+  const info = JSON.parse(lines.join('\n'));
   if (info._type === 'playlist') {
     throw new Error('Playlists are not supported yet; use a single video link');
   }
@@ -133,7 +101,7 @@ const PROGRESS_TEMPLATE =
 // first unchanged (it is often transient), then requesting formats as other clients.
 // yt-dlp skips clients that no longer exist with a warning.
 // Note: some clients (tv, mweb) only offer 360p, so retries pin the format picked by the
-// first attempt (see `pinnedFormat`) instead of silently downgrading quality.
+// first attempt (see `pinned`) instead of silently downgrading quality.
 export const RETRY_STRATEGIES = [
   [],
   [],
@@ -150,28 +118,30 @@ function pinFormat(formatIds) {
 }
 
 /**
- * yt-dlp arguments to download `url` into `dir` with already-sanitized options.
- * `extra` goes first (e.g. the YouTube client); `pinnedFormat` overrides format selection.
+ * yt-dlp arguments to download `url` into `dir`.
+ * `client` goes first (the retry strategy), `format` selects streams, `extra` adds anything
+ * else (e.g. a time range) and `pinned` overrides the format selection.
  */
-export function buildDownloadArgs(url, dir, opts, extra = [], pinnedFormat = null) {
-  const args = [
-    ...extra,
+export function buildDownloadArgs(url, dir, { client = [], format = [], extra = [], pinned = null } = {}) {
+  return [
+    ...client,
     '--newline',
     '--progress',
     '--progress-template', PROGRESS_TEMPLATE,
     '-P', dir,
     '-o', '%(title).120B [%(id)s].%(ext)s',
     '--embed-metadata',
-    ...formatArgs(opts),
-    // the last -f wins, so it goes after formatArgs
-    ...(pinnedFormat ? ['-f', pinFormat(pinnedFormat)] : []),
+    ...format,
+    ...extra,
+    // the last -f wins, so it goes after the format selection
+    ...(pinned ? ['-f', pinFormat(pinned)] : []),
     '--',
     url,
   ];
-  return args;
 }
 
-function formatArgs({ mode, videoFormat, quality, audioFormat, audioBitrate }) {
+/** Format selection for the downloader's options. */
+export function formatArgs({ mode, videoFormat, quality, audioFormat, audioBitrate }) {
   if (mode === 'audio') {
     const codec = { ogg: 'vorbis', original: 'best' }[audioFormat] || audioFormat;
     const args = ['-f', 'ba/b', '-x', '--audio-format', codec];
@@ -208,5 +178,59 @@ function formatArgs({ mode, videoFormat, quality, audioFormat, audioBitrate }) {
         '--merge-output-format', 'mp4',
         '--remux-video', 'mp4',
       ];
+  }
+}
+
+const POSTPROCESSORS = /^\[(Merger|ExtractAudio|VideoRemuxer|VideoConvertor|EmbedThumbnail|Metadata|Fixup\w*)\]/;
+
+/**
+ * Downloads `url` into `dir` as part of a job, reporting progress through `ctx`
+ * and retrying on 403 (see RETRY_STRATEGIES).
+ */
+export async function download(ctx, url, { dir, format = [], extra = [] }) {
+  let pinned = null;
+
+  for (let attempt = 0; ; attempt++) {
+    const parts = { part: 0, parts: 1 };
+    ctx.set({ attempt, ...parts });
+    ctx.stage('downloading');
+
+    const args = buildDownloadArgs(url, dir, { client: RETRY_STRATEGIES[attempt], format, extra, pinned });
+    const { code, stderr } = await ctx.run(BINARIES.ytdlp, [...BASE_ARGS, ...args], {
+      env: ENV,
+      onLine: (line) => {
+        if (line.startsWith('PROGRESS|')) {
+          const [, downloaded, total, estimate] = line.split('|').map(Number);
+          const size = total || estimate;
+          ctx.stage('downloading', size && downloaded ? Math.min(downloaded / size, 1) : null);
+          return;
+        }
+        const formats = line.match(/Downloading \d+ format\(s\): (\S+)/);
+        if (formats) {
+          // The first attempt decides the quality; retries stick to it.
+          pinned ??= formats[1];
+          parts.parts = formats[1].split('+').length;
+          ctx.set(parts);
+          return;
+        }
+        if (line.startsWith('[download] Destination:')) {
+          parts.part = Math.min(parts.part + 1, parts.parts);
+          ctx.set(parts);
+          return;
+        }
+        if (POSTPROCESSORS.test(line)) ctx.stage('processing');
+      },
+    });
+    if (code === 0) return;
+
+    const message = cleanError(stderr);
+    ctx.log(`attempt ${attempt + 1} failed: ${message}`);
+    if (ctx.cancelled) return;
+    if (isForbidden(message) && attempt + 1 < RETRY_STRATEGIES.length) continue;
+    throw new Error(
+      isForbidden(message) && pinned
+        ? `The site blocked the download (403) at the selected quality (${pinned}); try again in a few minutes`
+        : message,
+    );
   }
 }
