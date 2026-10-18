@@ -58,6 +58,8 @@ export function bindPaste(root) {
     btn.addEventListener('click', async () => {
       try {
         input.value = (await navigator.clipboard.readText()).trim();
+        // Let listeners react as if the user had typed it.
+        input.dispatchEvent(new Event('input', { bubbles: true }));
       } catch {
         // Clipboard access denied: the user can still paste by hand.
       }

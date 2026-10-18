@@ -102,17 +102,18 @@
           <video data-player controls muted playsinline hidden></video>
         </div>
 
+        <div data-trimmer hidden></div>
+        <p class="hint" data-source-hint hidden></p>
+
         <div class="range">
           <label>start
             <span class="time-input">
               <input name="start" value="0:00" inputmode="decimal" aria-label="Start time" required>
-              <button type="button" class="ghost small" data-mark="start" title="Use the player's current time" hidden>⏱ now</button>
             </span>
           </label>
           <label>end
             <span class="time-input">
               <input name="end" value="0:05" inputmode="decimal" aria-label="End time" required>
-              <button type="button" class="ghost small" data-mark="end" title="Use the player's current time" hidden>⏱ now</button>
             </span>
           </label>
           <span class="hint" data-length></span>

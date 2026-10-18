@@ -79,8 +79,12 @@ GIF or animated WebP. Built on ffmpeg.
 | width  | 320, 480, 640, 800, 1080     | Smaller videos are never upscaled                  |
 | format | gif, webp                    | WebP is smaller with full color; not every app opens it |
 
-- For files, a player lets you set the start and end from the current playback position.
-- For links, only the selected range is downloaded, cut on exact frames.
+- Pick the range on a phone-style trimmer: drag the handles to move the start or the end, drag the
+  selection to move both, or fine-tune with the arrow keys (Shift for 1 s steps) or by typing the times.
+- For files, the trimmer shows a filmstrip of the video, and the player loops inside the selected range
+  so you can preview the result. Thumbnails are made in the browser; nothing is uploaded until you convert.
+- For links, the trimmer uses the video's real length and thumbnail; only the selected range is
+  downloaded, cut on exact frames.
 - GIFs use a palette built from the clip itself, which gives far better colors than the default one.
 
 ---

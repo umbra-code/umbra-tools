@@ -1,7 +1,8 @@
-// Video → GIF UI: pick a file (with a player to choose the range) or a link.
-import { $, $$, bindOptions, bindPaste, formatTime, loadSettings, parseTime, saveSettings } from '../dom.js';
+// Video → GIF UI: pick a file or a link, choose the range on a trimmer, convert.
+import { $, bindOptions, bindPaste, formatTime, loadSettings, parseTime, saveSettings } from '../dom.js';
 import { api, upload } from '../api.js';
 import { createResult } from '../result.js';
+import { createTrimmer, renderFilmstrip } from '../trimmer.js';
 
 const DEFAULTS = {
   source: 'file',
@@ -10,52 +11,138 @@ const DEFAULTS = {
   format: 'gif',
 };
 const MAX_SECONDS = 60;
+const DEFAULT_LENGTH = 5;
+const FILMSTRIP_HEIGHT = 52;
+
+const cssUrl = (url) => `url("${url.replace(/["\\\n]/g, encodeURIComponent)}")`;
 
 export function init(section) {
   const form = $('form', section);
   const state = loadSettings('gif', DEFAULTS);
   const result = createResult($('.result-slot', section));
   const player = $('[data-player]', form);
-  const fileInput = form.file;
+  const trimmerEl = $('[data-trimmer]', form);
+  const hint = $('[data-source-hint]', form);
   let file = null;
 
-  bindOptions(form, state, () => saveSettings('gif', state));
-  bindPaste(form);
+  // What each source knows about its video: { duration, start, end, frames? , thumbnail? }.
+  // Kept separately so switching between file and link keeps each one's range.
+  const sources = { file: null, url: null };
+  const hints = { file: [''], url: [''] };
 
-  // --- Range ---------------------------------------------------------------------
+  const active = () => sources[state.source];
+  const playingFile = () => state.source === 'file' && sources.file;
+
+  // --- Range inputs ----------------------------------------------------------------
 
   const updateLength = () => {
     const start = parseTime(form.start.value);
     const end = parseTime(form.end.value);
-    const hint = $('[data-length]', form);
+    const lengthHint = $('[data-length]', form);
     const length = start != null && end != null ? end - start : null;
-    hint.textContent = length > 0 ? `${formatTime(length, true).replace(/^0:/, '')} s` : '';
-    hint.classList.toggle('error', length != null && (length <= 0 || length > MAX_SECONDS));
+    lengthHint.textContent = length > 0 ? `${length.toFixed(1)} s` : '';
+    lengthHint.classList.toggle('error', length != null && (length <= 0 || length > MAX_SECONDS));
   };
+
+  const writeInputs = (start, end) => {
+    form.start.value = formatTime(start, true);
+    form.end.value = formatTime(end, true);
+    updateLength();
+  };
+
+  const remember = (start, end) => {
+    if (active()) Object.assign(active(), { start, end });
+  };
+
+  // --- Trimmer -----------------------------------------------------------------------
+
+  const trimmer = createTrimmer(trimmerEl, {
+    maxLength: MAX_SECONDS,
+    onChange: ({ start, end, moving }) => {
+      remember(start, end);
+      writeInputs(start, end);
+      // Show the frame under the handle being dragged.
+      if (playingFile()) {
+        player.pause();
+        player.currentTime = moving === 'end' ? end : start;
+      }
+    },
+    onSeek: (time) => {
+      if (playingFile()) player.currentTime = time;
+    },
+  });
+
+  /** Shows the trimmer for the active source, or hides it when that source has no video yet. */
+  function showSource() {
+    const [text, kind = ''] = hints[state.source];
+    hint.textContent = text;
+    hint.className = `hint ${kind}`;
+    hint.hidden = !text;
+
+    const data = active();
+    trimmerEl.hidden = !data;
+    trimmer.setPlayhead(null);
+    if (!data) return;
+
+    trimmer.setDuration(data.duration);
+    const { start, end } = trimmer.setRange(data.start, data.end);
+    writeInputs(start, end);
+
+    const strip = trimmer.filmstrip;
+    if (data.frames) {
+      strip.style.backgroundImage = '';
+      strip.replaceChildren(...data.frames);
+    } else {
+      strip.replaceChildren();
+      strip.style.backgroundImage = data.thumbnail ? cssUrl(data.thumbnail) : '';
+    }
+  }
+
+  let source = state.source;
+  bindOptions(form, state, () => {
+    saveSettings('gif', state);
+    if (state.source !== source) {
+      source = state.source;
+      player.pause();
+      showSource();
+    }
+  });
+  bindPaste(form);
+
   form.start.addEventListener('input', updateLength);
   form.end.addEventListener('input', updateLength);
-  updateLength();
 
-  for (const btn of $$('[data-mark]', form)) {
-    btn.addEventListener('click', () => {
-      form[btn.dataset.mark].value = formatTime(player.currentTime, true);
-      updateLength();
+  // Typed times (on Enter or leaving the field) move the trimmer too.
+  for (const input of [form.start, form.end]) {
+    input.addEventListener('change', () => {
+      const start = parseTime(form.start.value);
+      const end = parseTime(form.end.value);
+      if (!active() || start == null || end == null) return;
+      const range = trimmer.setRange(start, end);
+      remember(range.start, range.end);
+      writeInputs(range.start, range.end);
+      if (playingFile()) player.currentTime = range.start;
     });
   }
 
-  // --- File picking ----------------------------------------------------------------
+  // --- File source ---------------------------------------------------------------------
+
+  let filmstripAbort = null;
 
   const setFile = (picked) => {
     if (!picked) return;
     file = picked;
     $('[data-file-label]', form).textContent = `${file.name} · change`;
-    URL.revokeObjectURL(player.src);
+    const previous = player.src;
     player.src = URL.createObjectURL(file);
+    if (previous) URL.revokeObjectURL(previous);
     player.hidden = false;
-    for (const btn of $$('[data-mark]', form)) btn.hidden = false;
+    sources.file = null;
+    hints.file = [''];
+    if (state.source === 'file') showSource();
   };
 
-  fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
+  form.file.addEventListener('change', () => setFile(form.file.files[0]));
 
   const dropzone = $('[data-dropzone]', form);
   dropzone.addEventListener('dragover', (e) => {
@@ -69,14 +156,90 @@ export function init(section) {
     setFile(e.dataTransfer.files[0]);
   });
 
-  // When the video loads, suggest a range if the default one does not fit.
   player.addEventListener('loadedmetadata', () => {
-    const end = parseTime(form.end.value);
-    if (end == null || end > player.duration) {
-      form.start.value = '0:00';
-      form.end.value = formatTime(Math.min(player.duration, 5), true);
-      updateLength();
+    const { duration } = player;
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    const data = { duration, start: 0, end: Math.min(duration, DEFAULT_LENGTH), frames: null };
+    sources.file = data;
+    if (state.source === 'file') showSource();
+
+    filmstripAbort?.abort();
+    filmstripAbort = new AbortController();
+    renderFilmstrip(player.src, {
+      width: trimmerEl.clientWidth || form.clientWidth,
+      height: FILMSTRIP_HEIGHT,
+      signal: filmstripAbort.signal,
+      onFrames: (frames) => {
+        data.frames = frames;
+        if (active() === data) trimmer.filmstrip.replaceChildren(...frames);
+      },
+    }).catch(() => {
+      // No thumbnails: the trimmer still works on a plain track.
+    });
+  });
+
+  player.addEventListener('error', () => {
+    if (!file) return;
+    sources.file = null;
+    hints.file = ["This browser can't preview this file; type the start and end below.", 'warn'];
+    if (state.source === 'file') showSource();
+  });
+
+  // Playback loops inside the selected range, like a phone trimmer.
+  const tick = () => {
+    if (player.paused || !playingFile()) return;
+    const { start, end } = trimmer.range;
+    if (player.currentTime >= end) player.currentTime = start;
+    trimmer.setPlayhead(player.currentTime);
+    requestAnimationFrame(tick);
+  };
+  player.addEventListener('play', () => {
+    if (!playingFile()) return;
+    const { start, end } = trimmer.range;
+    if (player.currentTime < start || player.currentTime >= end) player.currentTime = start;
+    requestAnimationFrame(tick);
+  });
+  player.addEventListener('timeupdate', () => {
+    if (playingFile()) trimmer.setPlayhead(player.currentTime);
+  });
+
+  // --- Link source ---------------------------------------------------------------------
+
+  let infoAbort = null;
+  let infoTimer = null;
+
+  async function loadInfo(url) {
+    infoAbort = new AbortController();
+    hints.url = ['loading video info…'];
+    if (state.source === 'url') showSource();
+    try {
+      const info = await api('/api/info', { method: 'POST', body: { url }, signal: infoAbort.signal });
+      if (info.duration) {
+        sources.url = {
+          duration: info.duration,
+          start: 0,
+          end: Math.min(info.duration, DEFAULT_LENGTH),
+          thumbnail: info.thumbnail,
+        };
+        hints.url = [[info.title, formatTime(info.duration)].filter(Boolean).join(' · ')];
+      } else {
+        hints.url = ['This link has no fixed length (a live stream?); type the start and end below.', 'warn'];
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      hints.url = [err.message, 'error'];
     }
+    if (state.source === 'url') showSource();
+  }
+
+  form.url.addEventListener('input', () => {
+    clearTimeout(infoTimer);
+    infoAbort?.abort();
+    sources.url = null;
+    hints.url = [''];
+    if (state.source === 'url') showSource();
+    const url = form.url.value.trim();
+    if (/^https?:\/\/\S+\.\S+/.test(url)) infoTimer = setTimeout(() => loadInfo(url), 600);
   });
 
   // --- Submit -----------------------------------------------------------------------
@@ -104,6 +267,7 @@ export function init(section) {
       return;
     }
 
+    player.pause();
     const go = $('.go', form);
     go.disabled = true;
     await result.run(
@@ -126,4 +290,7 @@ export function init(section) {
     );
     go.disabled = false;
   });
+
+  updateLength();
+  showSource();
 }

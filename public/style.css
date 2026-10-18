@@ -8,6 +8,9 @@
   --accent-text: #ffffff;
   --error: #dc2626;
   --ok: #16a34a;
+  --warn: #b45309;
+  --trim: #facc15;
+  --trim-grip: rgb(0 0 0 / 0.45);
   --radius: 12px;
   color-scheme: light;
 }
@@ -23,6 +26,7 @@
     --accent-text: #0a0a0b;
     --error: #f87171;
     --ok: #4ade80;
+    --warn: #fbbf24;
     color-scheme: dark;
   }
 }
@@ -196,8 +200,101 @@ video {
 }
 .time-input:focus-within { border-color: var(--muted); }
 .time-input input { padding: 6px 10px; }
-.hint { color: var(--muted); font-size: 0.8rem; padding-bottom: 8px; }
+.hint { color: var(--muted); font-size: 0.8rem; padding-bottom: 8px; margin: 0; overflow-wrap: anywhere; }
 .hint.error { color: var(--error); }
+.hint.warn { color: var(--warn); }
+
+/* Trimmer: handles sit just outside the selection, so the track leaves room for them. */
+.trimmer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 14px 0;
+}
+.track {
+  position: relative;
+  height: 52px;
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+}
+.strip-clip {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.filmstrip {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  background-color: var(--border);
+  background-size: auto 100%;
+  background-repeat: repeat-x;
+}
+.filmstrip canvas {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.shade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgb(0 0 0 / 0.6);
+}
+.shade.start { left: 0; }
+.shade.end { right: 0; }
+.selection {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  border-block: 3px solid var(--trim);
+  cursor: grab;
+}
+.dragging .selection { cursor: grabbing; }
+.handle {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 14px;
+  background: var(--trim);
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.handle::after {
+  content: '';
+  width: 2px;
+  height: 40%;
+  border-radius: 1px;
+  background: var(--trim-grip);
+}
+.handle.start { left: -14px; border-radius: 6px 0 0 6px; }
+.handle.end { right: -14px; border-radius: 0 6px 6px 0; }
+.handle:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.playhead {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  border-radius: 1px;
+  box-shadow: 0 0 3px rgb(0 0 0 / 0.8);
+  pointer-events: none;
+}
+.trimmer-times {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.trimmer-times [data-time="length"] { color: var(--text); }
 
 /* --- Result -------------------------------------------------------------------------- */
 
