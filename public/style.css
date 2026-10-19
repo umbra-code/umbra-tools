@@ -204,6 +204,15 @@ video {
 .hint.error { color: var(--error); }
 .hint.warn { color: var(--warn); }
 
+/* Video converter: target size field with quick picks. */
+.size-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.size-input { width: 130px; }
+.size-input input { -moz-appearance: textfield; }
+.size-input input::-webkit-inner-spin-button,
+.size-input input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.unit { padding-right: 10px; color: var(--muted); }
+[data-show-when="mode=size"] .hint { padding-bottom: 0; }
+
 /* Trimmer: handles sit just outside the selection, so the track leaves room for them. */
 .trimmer {
   display: flex;
@@ -333,6 +342,11 @@ video {
   border-radius: 8px;
   /* checkerboard so transparent frames are visible */
   background: repeating-conic-gradient(var(--border) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+}
+.output-video {
+  width: 100%;
+  max-height: 360px;
+  margin: 0;
 }
 
 .bar {

@@ -10,7 +10,7 @@ Everything runs on your machine, so files never leave it and there are no upload
 |------|--------|-------------|
 | [Media downloader](#media-downloader) | ✅ available | Save video or audio from a link, on any [site supported by yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) |
 | [Video → GIF](#video--gif) | ✅ available | Turn a time range of a video file or link into a GIF or animated WebP |
-| Video converter | 🗺️ planned | Change container/codec, resolution or bitrate; trim and compress |
+| [Video converter](#video-converter) | ✅ available | Trim, resize, change format/codec and compress, also to a target file size |
 | Audio converter | 🗺️ planned | Convert between mp3, m4a, opus, wav, flac…; extract audio from video |
 | Image converter | 🗺️ planned | Convert between png, jpg, webp, avif…; resize and compress |
 | Document converter | 🗺️ planned | Convert between common document formats (e.g. to PDF) |
@@ -89,6 +89,26 @@ GIF or animated WebP. Built on ffmpeg.
 
 ---
 
+## Video converter
+
+Pick a video file or a link, optionally trim it on the same trimmer as Video → GIF, and convert it.
+
+| Option      | Values                                  | Notes                                                    |
+|-------------|-----------------------------------------|----------------------------------------------------------|
+| format      | mp4, webm, mkv                          | webm always uses VP9 + Opus                              |
+| codec       | h.264, h.265                            | mp4 and mkv; h.265 is about half the size, slower to encode |
+| resolution  | original, 4k … 360p                     | Smaller videos are never upscaled                        |
+| fps         | original, 60, 30, 24                    |                                                          |
+| audio       | keep, remove                            | Kept audio is re-encoded at 128 kbit/s (AAC, or Opus in webm) |
+| compression | by quality (high, balanced, small file) | Constant quality: the size follows the content           |
+|             | to a size (MB)                          | Two-pass encoding at the bitrate that fits the target, e.g. 10 MB to share in a chat |
+
+- The whole video is converted unless you trim it.
+- In "to a size" mode, the form shows the bitrate the target leaves and warns when it is too low for the length.
+- For links, the video is downloaded without re-encoding (at most at the chosen resolution) and then converted.
+
+---
+
 ## Architecture
 
 The app is a small Express server plus a dependency-free frontend. Long-running work runs as
@@ -101,14 +121,18 @@ src/core/                shared by every tool
   jobs.js                job queue, progress, cancellation, temp file cleanup
   input.js               option allowlists, links and uploaded files
   process.js             child processes (line-by-line output, killing process trees)
+  media.js               ffprobe and ffmpeg helpers (what a file contains, progress, errors)
   files.js, time.js      file names, time parsing
   paths.js               binaries and temp locations
 src/tools/               one folder per tool
   index.js               tool registry
   downloader/            media downloader; ytdlp.js is reused by tools that accept links
   gif/                   video → GIF
+  video/                 video converter
 public/                  UI (plain HTML/CSS/JS modules)
   js/main.js             tool menu
+  js/media-source.js     file-or-link picker with player and trimmer, shared by the video tools
+  js/trimmer.js          the trimmer
   js/tools/<tool>.js     one module per tool
 scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
 ```
@@ -123,6 +147,7 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
   plus `tool` (`downloader` by default) and the tool's options:
   - `downloader`: `mode`, `videoFormat`, `quality`, `audioFormat`, `audioBitrate`
   - `gif`: `start`, `end`, `fps`, `width`, `format`
+  - `video`: `start`, `end`, `format`, `codec`, `resolution`, `fps`, `audio`, `mode`, `quality`, `targetMb`
 - `GET /api/jobs/:id` → `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage` and `progress`
 - `GET /api/jobs/:id/file` → the finished file
 - `DELETE /api/jobs/:id` → cancels the job
@@ -172,7 +197,7 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Generalize jobs so they are not tied to yt-dlp (file uploads as job input)
 - [x] Tool menu / navigation in the UI
 - [x] Video → GIF / animated WebP
-- [ ] Video converter (trim, compress, change codec/resolution)
+- [x] Video converter (trim, compress, change codec/resolution)
 - [ ] Audio converter
 - [ ] Image converter
 - [ ] Document converter

@@ -2,29 +2,16 @@
 import path from 'node:path';
 import { BINARIES } from '../../core/paths.js';
 import { largestFile, safeFileName, stripExtension } from '../../core/files.js';
+import { ffmpegError, ffmpegProgress, probeMedia } from '../../core/media.js';
 import { formatTime } from '../../core/time.js';
 import { download } from '../downloader/ytdlp.js';
 import { buildFfmpegArgs, parseOptions } from './options.js';
 
 /** Length of the video in seconds; throws when the file has no video stream. */
 async function probeDuration(ctx, file) {
-  const lines = [];
-  const { code } = await ctx.run(
-    BINARIES.ffprobe,
-    ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_type:format=duration', '-of', 'json', file],
-    { onLine: (line) => lines.push(line) },
-  );
-  let probe = {};
-  try {
-    probe = JSON.parse(lines.join('\n'));
-  } catch {
-    // handled below
-  }
-  const duration = Number(probe.format?.duration);
-  if (code !== 0 || !probe.streams?.length || !Number.isFinite(duration)) {
-    throw new Error('The file does not look like a video');
-  }
-  return duration;
+  const media = await probeMedia(ctx, file);
+  if (!media.hasVideo) throw new Error('The file does not look like a video');
+  return media.duration;
 }
 
 /** The clip to convert: the uploaded file, or just the selected range of the link. */
@@ -71,13 +58,11 @@ export default {
     const args = buildFfmpegArgs(input, output, { seek, duration, fps, width, format });
     const { code, stderr } = await ctx.run(BINARIES.ffmpeg, args, {
       onLine: (line) => {
-        const time = tracksProgress && line.match(/^out_time_us=(\d+)/);
-        if (time) ctx.progress(Math.min(Number(time[1]) / 1e6 / duration, 1));
+        if (!tracksProgress) return;
+        const progress = ffmpegProgress(line, duration);
+        if (progress != null) ctx.progress(progress);
       },
     });
-    if (code !== 0 && !ctx.cancelled) {
-      const lastLine = stderr.trim().split(/\r?\n/).pop();
-      throw new Error(lastLine ? `ffmpeg: ${lastLine}` : 'The conversion failed');
-    }
+    if (code !== 0 && !ctx.cancelled) throw ffmpegError(stderr);
   },
 };

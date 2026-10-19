@@ -17,10 +17,11 @@ export function killTree(child) {
  * reject on a non-zero exit, only when the command cannot start (e.g. ENOENT).
  * `onLine` receives stdout line by line; `track` receives the child as soon as it exists.
  */
-export function runProcess(command, args, { onLine, track, env } = {}) {
+export function runProcess(command, args, { onLine, track, env, cwd } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       windowsHide: true,
+      cwd,
       env: { ...process.env, ...env },
     });
     track?.(child);

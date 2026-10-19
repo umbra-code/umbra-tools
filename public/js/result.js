@@ -6,6 +6,7 @@ function describe(job) {
   if (job.status === 'queued') return 'queued…';
   const pct = job.progress != null ? ` ${Math.round(job.progress * 100)}%` : '';
   const retry = job.attempt ? ` · retry ${job.attempt}` : '';
+  const pass = job.passes > 1 ? ` (pass ${job.pass}/${job.passes})` : '';
   switch (job.stage) {
     case 'downloading': {
       const part = job.parts > 1 ? ` (part ${Math.max(job.part, 1)}/${job.parts})` : '';
@@ -13,8 +14,10 @@ function describe(job) {
     }
     case 'processing':
       return 'processing with ffmpeg…';
+    case 'analyzing':
+      return `analyzing${pass}${pct || '…'}`;
     case 'converting':
-      return `converting${pct || '…'}`;
+      return `converting${pass}${pct || '…'}`;
     default:
       return `working${pct || '…'}`;
   }
@@ -44,6 +47,12 @@ export function createResult(slot) {
     setStatus,
     setProgress,
 
+    /** Shows upload progress (0–1, or null when unknown). */
+    uploadProgress(value) {
+      setStatus(`uploading${value != null ? ` ${Math.round(value * 100)}%` : '…'}`);
+      setProgress(value);
+    },
+
     get busy() {
       return controller !== null;
     },
@@ -71,6 +80,9 @@ export function createResult(slot) {
       panel.hidden = false;
       el('preview').hidden = true;
       el('output').hidden = true;
+      el('output-video').pause();
+      el('output-video').removeAttribute('src');
+      el('output-video').hidden = true;
       el('again').hidden = true;
       el('cancel').hidden = false;
       setStatus('starting…');
@@ -106,6 +118,12 @@ export function createResult(slot) {
     showImage(src) {
       el('output').src = src;
       el('output').hidden = false;
+    },
+
+    /** Shows a video result inside the panel, ready to play. */
+    showVideo(src) {
+      el('output-video').src = src;
+      el('output-video').hidden = false;
     },
   };
 }

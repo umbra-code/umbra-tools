@@ -17,6 +17,7 @@
     <nav class="tabs" role="tablist" aria-label="Tools">
       <button type="button" role="tab" data-tool="downloader">⬇ downloader</button>
       <button type="button" role="tab" data-tool="gif">🎞 video → gif</button>
+      <button type="button" role="tab" data-tool="video">🎬 convert video</button>
     </nav>
 
     <!-- Media downloader -->
@@ -84,40 +85,7 @@
     <!-- Video → GIF -->
     <section id="tool-gif" class="tool" role="tabpanel" hidden>
       <form autocomplete="off">
-        <div class="group" data-key="source" role="group" aria-label="Source">
-          <button type="button" data-value="file">📁 file</button>
-          <button type="button" data-value="url">🔗 link</button>
-        </div>
-
-        <div class="input-row" data-show-when="source=url">
-          <input name="url" type="url" placeholder="paste the link here" aria-label="Link">
-          <button type="button" class="ghost" data-paste title="Paste from clipboard">paste</button>
-        </div>
-
-        <div data-show-when="source=file">
-          <label class="dropzone" data-dropzone>
-            <input name="file" type="file" accept="video/*" hidden>
-            <span data-file-label>drop a video here or click to choose one</span>
-          </label>
-          <video data-player controls muted playsinline hidden></video>
-        </div>
-
-        <div data-trimmer hidden></div>
-        <p class="hint" data-source-hint hidden></p>
-
-        <div class="range">
-          <label>start
-            <span class="time-input">
-              <input name="start" value="0:00" inputmode="decimal" aria-label="Start time" required>
-            </span>
-          </label>
-          <label>end
-            <span class="time-input">
-              <input name="end" value="0:05" inputmode="decimal" aria-label="End time" required>
-            </span>
-          </label>
-          <span class="hint" data-length></span>
-        </div>
+        <div data-media-source></div>
 
         <div class="options">
           <label>fps
@@ -151,6 +119,124 @@
       <div class="result-slot"></div>
     </section>
 
+    <!-- Video converter -->
+    <section id="tool-video" class="tool" role="tabpanel" hidden>
+      <form autocomplete="off">
+        <div data-media-source></div>
+
+        <div class="options">
+          <label>format
+            <div class="group" data-key="format">
+              <button type="button" data-value="mp4">mp4</button>
+              <button type="button" data-value="webm">webm</button>
+              <button type="button" data-value="mkv">mkv</button>
+            </div>
+          </label>
+          <label data-show-when="format!=webm">codec
+            <div class="group" data-key="codec">
+              <button type="button" data-value="h264" title="Plays everywhere">h.264</button>
+              <button type="button" data-value="h265" title="About half the size for the same quality; slower to encode, some older devices can't play it">h.265</button>
+            </div>
+          </label>
+          <label>resolution
+            <div class="group" data-key="resolution">
+              <button type="button" data-value="original">original</button>
+              <button type="button" data-value="2160">4k</button>
+              <button type="button" data-value="1440">1440p</button>
+              <button type="button" data-value="1080">1080p</button>
+              <button type="button" data-value="720">720p</button>
+              <button type="button" data-value="480">480p</button>
+              <button type="button" data-value="360">360p</button>
+            </div>
+          </label>
+          <label>fps
+            <div class="group" data-key="fps">
+              <button type="button" data-value="original">original</button>
+              <button type="button" data-value="60">60</button>
+              <button type="button" data-value="30">30</button>
+              <button type="button" data-value="24">24</button>
+            </div>
+          </label>
+          <label>audio
+            <div class="group" data-key="audio">
+              <button type="button" data-value="keep">keep</button>
+              <button type="button" data-value="remove">remove</button>
+            </div>
+          </label>
+          <label>compression
+            <div class="group" data-key="mode">
+              <button type="button" data-value="quality">by quality</button>
+              <button type="button" data-value="size">to a size</button>
+            </div>
+          </label>
+          <label data-show-when="mode=quality">quality
+            <div class="group" data-key="quality">
+              <button type="button" data-value="high">high</button>
+              <button type="button" data-value="balanced">balanced</button>
+              <button type="button" data-value="small">small file</button>
+            </div>
+          </label>
+          <label data-show-when="mode=size">target size
+            <span class="size-row">
+              <span class="time-input size-input">
+                <input name="targetMb" type="number" min="0.1" max="10000" step="any" value="10" aria-label="Target size in MB">
+                <span class="unit">MB</span>
+              </span>
+              <span class="group" data-fill-size>
+                <button type="button" data-mb="8">8</button>
+                <button type="button" data-mb="10">10</button>
+                <button type="button" data-mb="25">25</button>
+                <button type="button" data-mb="50">50</button>
+                <button type="button" data-mb="100">100</button>
+              </span>
+            </span>
+            <span class="hint" data-size-hint></span>
+          </label>
+        </div>
+
+        <button type="submit" class="go wide">convert</button>
+      </form>
+      <div class="result-slot"></div>
+    </section>
+
+    <!-- File or link, with a player and a trimmer; used by the video tools. -->
+    <template id="media-source-template">
+      <div class="group" data-key="source" role="group" aria-label="Source">
+        <button type="button" data-value="file">📁 file</button>
+        <button type="button" data-value="url">🔗 link</button>
+      </div>
+
+      <div class="input-row" data-show-when="source=url">
+        <input name="url" type="url" placeholder="paste the link here" aria-label="Link">
+        <button type="button" class="ghost" data-paste title="Paste from clipboard">paste</button>
+      </div>
+
+      <div data-show-when="source=file">
+        <label class="dropzone" data-dropzone>
+          <input name="file" type="file" accept="video/*" hidden>
+          <span data-file-label>drop a video here or click to choose one</span>
+        </label>
+        <video data-player controls muted playsinline hidden></video>
+      </div>
+
+      <div data-trimmer hidden></div>
+      <p class="hint" data-source-hint hidden></p>
+
+      <div class="range">
+        <label>start
+          <span class="time-input">
+            <input name="start" value="0:00" inputmode="decimal" aria-label="Start time">
+          </span>
+        </label>
+        <label>end
+          <span class="time-input">
+            <input name="end" value="" placeholder="end of video" inputmode="decimal" aria-label="End time">
+          </span>
+        </label>
+        <span class="hint" data-length></span>
+      </div>
+    </template>
+
     <template id="result-template">
       <section class="result" hidden>
         <div class="preview" hidden>
@@ -161,6 +247,7 @@
           </div>
         </div>
         <img class="output" alt="Result preview" hidden>
+        <video class="output-video" controls playsinline hidden></video>
         <div class="status">
           <div class="bar"><div class="bar-fill"></div></div>
           <div class="status-row">
