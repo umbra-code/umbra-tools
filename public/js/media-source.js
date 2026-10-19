@@ -1,8 +1,9 @@
-// The "what video?" part of a tool's form: a file (with a player) or a link, plus the range,
+// The "what media?" part of a tool's form: a file (with a player) or a link, plus the range,
 // picked on a trimmer or typed. Cloned from #media-source-template into `[data-media-source]`.
+// Videos get a filmstrip on the trimmer; audio files get their waveform.
 import { $, formatTime, parseTime } from './dom.js';
 import { api, upload } from './api.js';
-import { createTrimmer, renderFilmstrip } from './trimmer.js';
+import { createTrimmer, renderFilmstrip, renderWaveform } from './trimmer.js';
 
 const FILMSTRIP_HEIGHT = 52;
 
@@ -12,14 +13,28 @@ const cssUrl = (url) => `url("${url.replace(/["\\\n]/g, encodeURIComponent)}")`;
  * `state.source` ('file' or 'url') selects the source; call `sync()` after it changes.
  * `maxLength`: longest range allowed (seconds). `defaultLength`: initial range for a new video.
  * `onRangeChange({ start, end })`: called whenever the range changes (seconds or null).
+ * `accept` and `label`: which files the picker takes and what its drop zone says.
  */
-export function createMediaSource(form, state, { maxLength = Infinity, defaultLength = Infinity, onRangeChange } = {}) {
+export function createMediaSource(
+  form,
+  state,
+  {
+    maxLength = Infinity,
+    defaultLength = Infinity,
+    onRangeChange,
+    accept = 'video/*',
+    label = 'drop a video here or click to choose one',
+  } = {},
+) {
   $('[data-media-source]', form).append($('#media-source-template').content.cloneNode(true));
 
   const player = $('[data-player]', form);
   const trimmerEl = $('[data-trimmer]', form);
   const hint = $('[data-source-hint]', form);
   let file = null;
+
+  form.file.accept = accept;
+  $('[data-file-label]', form).textContent = label;
 
   // What each source knows about its video: { duration, start, end, frames?, thumbnail? }.
   // Kept separately so switching between file and link keeps each one's range.
@@ -147,20 +162,30 @@ export function createMediaSource(form, state, { maxLength = Infinity, defaultLe
     if (!Number.isFinite(duration) || duration <= 0) return;
     const data = { duration, start: 0, end: Math.min(duration, defaultLength), frames: null };
     sources.file = data;
+    // Audio files have no picture: a compact player and a waveform instead of frames.
+    const audioOnly = player.videoWidth === 0;
+    player.classList.toggle('audio-only', audioOnly);
     if (state.source === 'file') showSource();
 
     filmstripAbort?.abort();
     filmstripAbort = new AbortController();
-    renderFilmstrip(player.src, {
+    const showFrames = (frames) => {
+      data.frames = frames;
+      if (active() === data) trimmer.filmstrip.replaceChildren(...frames);
+    };
+    const size = {
       width: trimmerEl.clientWidth || form.clientWidth,
       height: FILMSTRIP_HEIGHT,
       signal: filmstripAbort.signal,
-      onFrames: (frames) => {
-        data.frames = frames;
-        if (active() === data) trimmer.filmstrip.replaceChildren(...frames);
-      },
-    }).catch(() => {
-      // No thumbnails: the trimmer still works on a plain track.
+    };
+    const rendering = audioOnly
+      ? renderWaveform(file, {
+          ...size,
+          color: getComputedStyle(document.documentElement).getPropertyValue('--muted'),
+        }).then((canvas) => canvas && showFrames([canvas]))
+      : renderFilmstrip(player.src, { ...size, onFrames: showFrames });
+    rendering.catch(() => {
+      // No thumbnails or waveform: the trimmer still works on a plain track.
     });
   });
 
@@ -248,7 +273,7 @@ export function createMediaSource(form, state, { maxLength = Infinity, defaultLe
 
     /** A message when there is nothing to work on yet; null when ready. */
     missing() {
-      if (state.source === 'file' && !file) return 'choose a video first';
+      if (state.source === 'file' && !file) return 'choose a file first';
       if (state.source === 'url' && !form.url.value.trim()) return 'paste a link first';
       return null;
     },

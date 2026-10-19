@@ -181,6 +181,52 @@ const once = (target, event, timeoutMs = 4000) =>
     target.addEventListener('error', () => (clearTimeout(timer), reject(new Error('video error'))), { once: true });
   });
 
+// Decoding needs the whole file in memory; past this size the trimmer just shows a plain track.
+const MAX_WAVEFORM_BYTES = 300 * 1024 * 1024;
+// Decoded at a low sample rate: plenty for a picture of the loudness, and far less memory.
+const WAVEFORM_SAMPLE_RATE = 8000;
+
+/**
+ * Draws the waveform of an audio file as bars on a `width`×`height` px canvas, in `color`.
+ * Resolves with the canvas, or null when the file is too big or `signal` aborts.
+ */
+export async function renderWaveform(blob, { width, height, signal, color }) {
+  if (blob.size > MAX_WAVEFORM_BYTES) return null;
+  const bytes = await blob.arrayBuffer();
+  if (signal.aborted) return null;
+  const audio = await new OfflineAudioContext(1, 1, WAVEFORM_SAMPLE_RATE).decodeAudioData(bytes);
+  if (signal.aborted) return null;
+
+  const scale = window.devicePixelRatio || 1;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+
+  const samples = audio.getChannelData(0);
+  const barWidth = 2 * scale;
+  const step = barWidth + scale;
+  const bars = Math.max(1, Math.floor(canvas.width / step));
+  const perBar = Math.max(1, Math.floor(samples.length / bars));
+  const stride = Math.max(1, Math.floor(perBar / 200)); // a sample of each slice finds its peak
+
+  const peaks = Array.from({ length: bars }, (_, i) => {
+    let peak = 0;
+    for (let j = i * perBar; j < Math.min((i + 1) * perBar, samples.length); j += stride) {
+      peak = Math.max(peak, Math.abs(samples[j]));
+    }
+    return peak;
+  });
+  const loudest = Math.max(...peaks, 0.01);
+
+  const g = canvas.getContext('2d');
+  g.fillStyle = color;
+  peaks.forEach((peak, i) => {
+    const h = Math.max(scale, (peak / loudest) * canvas.height * 0.85);
+    g.fillRect(i * step, (canvas.height - h) / 2, barWidth, h);
+  });
+  return canvas;
+}
+
 /**
  * Draws frames of the video at `src`, spread over its length, for a strip of `width`×`height` px.
  * Runs in the browser with a hidden video and a canvas per frame; stops when `signal` aborts.
