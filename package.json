@@ -1,6 +1,6 @@
 {
   "name": "umbra-tools",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Self-hosted toolbox for media and file tasks, built on yt-dlp and ffmpeg",
   "type": "module",
