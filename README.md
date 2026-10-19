@@ -11,7 +11,7 @@ Everything runs on your machine, so files never leave it and there are no upload
 | [Media downloader](#media-downloader) | ✅ available | Save video or audio from a link, on any [site supported by yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) |
 | [Video → GIF](#video--gif) | ✅ available | Turn a time range of a video file or link into a GIF or animated WebP |
 | [Video converter](#video-converter) | ✅ available | Trim, resize, change format/codec and compress, also to a target file size |
-| Audio converter | 🗺️ planned | Convert between mp3, m4a, opus, wav, flac…; extract audio from video |
+| [Audio converter](#audio-converter) | ✅ available | Convert, trim, downmix and normalize audio, or extract it from a video |
 | Image converter | 🗺️ planned | Convert between png, jpg, webp, avif…; resize and compress |
 | Document converter | 🗺️ planned | Convert between common document formats (e.g. to PDF) |
 
@@ -109,6 +109,24 @@ Pick a video file or a link, optionally trim it on the same trimmer as Video →
 
 ---
 
+## Audio converter
+
+Pick an audio or video file, or a link, optionally trim it, and convert its audio.
+
+| Option   | Values                              | Notes                                                      |
+|----------|-------------------------------------|------------------------------------------------------------|
+| format   | mp3, m4a, opus, ogg, wav, flac      | wav is uncompressed, flac is lossless                      |
+| bitrate  | 320, 256, 192, 128, 96 kbit/s       | Lossy formats only                                         |
+| channels | original, mono                      | Mono halves the size; fine for voice                       |
+| volume   | as is, normalize                    | EBU R128 loudness normalization to -16 LUFS                |
+
+- From a video, only its audio track is kept: an easy way to extract the audio.
+- Audio files show their waveform on the trimmer (decoded in the browser, for files up to 300 MB).
+- Metadata such as title and artist is carried over; the sample rate is kept, except for opus, which is always 48 kHz.
+- For links, only the best audio stream is downloaded.
+
+---
+
 ## Architecture
 
 The app is a small Express server plus a dependency-free frontend. Long-running work runs as
@@ -129,10 +147,11 @@ src/tools/               one folder per tool
   downloader/            media downloader; ytdlp.js is reused by tools that accept links
   gif/                   video → GIF
   video/                 video converter
+  audio/                 audio converter
 public/                  UI (plain HTML/CSS/JS modules)
   js/main.js             tool menu
-  js/media-source.js     file-or-link picker with player and trimmer, shared by the video tools
-  js/trimmer.js          the trimmer
+  js/media-source.js     file-or-link picker with player and trimmer, shared by the media tools
+  js/trimmer.js          the trimmer, with filmstrip (video) and waveform (audio)
   js/tools/<tool>.js     one module per tool
 scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
 ```
@@ -148,6 +167,7 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
   - `downloader`: `mode`, `videoFormat`, `quality`, `audioFormat`, `audioBitrate`
   - `gif`: `start`, `end`, `fps`, `width`, `format`
   - `video`: `start`, `end`, `format`, `codec`, `resolution`, `fps`, `audio`, `mode`, `quality`, `targetMb`
+  - `audio`: `start`, `end`, `format`, `bitrate`, `channels`, `normalize`
 - `GET /api/jobs/:id` → `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage` and `progress`
 - `GET /api/jobs/:id/file` → the finished file
 - `DELETE /api/jobs/:id` → cancels the job
@@ -198,7 +218,7 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Tool menu / navigation in the UI
 - [x] Video → GIF / animated WebP
 - [x] Video converter (trim, compress, change codec/resolution)
-- [ ] Audio converter
+- [x] Audio converter
 - [ ] Image converter
 - [ ] Document converter
 - [ ] Downloader: playlists, cookies for age-restricted videos
