@@ -18,6 +18,7 @@
       <button type="button" role="tab" data-tool="downloader">⬇ downloader</button>
       <button type="button" role="tab" data-tool="gif">🎞 video → gif</button>
       <button type="button" role="tab" data-tool="video">🎬 convert video</button>
+      <button type="button" role="tab" data-tool="audio">🎵 convert audio</button>
     </nav>
 
     <!-- Media downloader -->
@@ -199,7 +200,51 @@
       <div class="result-slot"></div>
     </section>
 
-    <!-- File or link, with a player and a trimmer; used by the video tools. -->
+    <!-- Audio converter -->
+    <section id="tool-audio" class="tool" role="tabpanel" hidden>
+      <form autocomplete="off">
+        <div data-media-source></div>
+
+        <div class="options">
+          <label>format
+            <div class="group" data-key="format">
+              <button type="button" data-value="mp3">mp3</button>
+              <button type="button" data-value="m4a">m4a</button>
+              <button type="button" data-value="opus" title="Best quality for its size">opus</button>
+              <button type="button" data-value="ogg">ogg</button>
+              <button type="button" data-value="wav" title="Uncompressed">wav</button>
+              <button type="button" data-value="flac" title="Lossless and compressed">flac</button>
+            </div>
+          </label>
+          <label data-show-when="format!=wav,flac">bitrate
+            <div class="group" data-key="bitrate">
+              <button type="button" data-value="320">320k</button>
+              <button type="button" data-value="256">256k</button>
+              <button type="button" data-value="192">192k</button>
+              <button type="button" data-value="128">128k</button>
+              <button type="button" data-value="96">96k</button>
+            </div>
+          </label>
+          <label>channels
+            <div class="group" data-key="channels">
+              <button type="button" data-value="original">original</button>
+              <button type="button" data-value="mono" title="Half the size; fine for voice">mono</button>
+            </div>
+          </label>
+          <label>volume
+            <div class="group" data-key="normalize">
+              <button type="button" data-value="off">as is</button>
+              <button type="button" data-value="on" title="Evens out the loudness to a standard level (EBU R128, -16 LUFS)">normalize</button>
+            </div>
+          </label>
+        </div>
+
+        <button type="submit" class="go wide">convert</button>
+      </form>
+      <div class="result-slot"></div>
+    </section>
+
+    <!-- File or link, with a player and a trimmer; used by the video and audio tools. -->
     <template id="media-source-template">
       <div class="group" data-key="source" role="group" aria-label="Source">
         <button type="button" data-value="file">📁 file</button>
@@ -248,6 +293,7 @@
         </div>
         <img class="output" alt="Result preview" hidden>
         <video class="output-video" controls playsinline hidden></video>
+        <audio class="output-audio" controls hidden></audio>
         <div class="status">
           <div class="bar"><div class="bar-fill"></div></div>
           <div class="status-row">

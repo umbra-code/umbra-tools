@@ -3,8 +3,9 @@ import { $, $$ } from './dom.js';
 import * as downloader from './tools/downloader.js';
 import * as gif from './tools/gif.js';
 import * as video from './tools/video.js';
+import * as audio from './tools/audio.js';
 
-const tools = { downloader, gif, video };
+const tools = { downloader, gif, video, audio };
 const DEFAULT_TOOL = 'downloader';
 
 for (const [id, tool] of Object.entries(tools)) tool.init($(`#tool-${id}`));

@@ -80,9 +80,11 @@ export function createResult(slot) {
       panel.hidden = false;
       el('preview').hidden = true;
       el('output').hidden = true;
-      el('output-video').pause();
-      el('output-video').removeAttribute('src');
-      el('output-video').hidden = true;
+      for (const media of [el('output-video'), el('output-audio')]) {
+        media.pause();
+        media.removeAttribute('src');
+        media.hidden = true;
+      }
       el('again').hidden = true;
       el('cancel').hidden = false;
       setStatus('starting…');
@@ -124,6 +126,12 @@ export function createResult(slot) {
     showVideo(src) {
       el('output-video').src = src;
       el('output-video').hidden = false;
+    },
+
+    /** Shows an audio result inside the panel, ready to play. */
+    showAudio(src) {
+      el('output-audio').src = src;
+      el('output-audio').hidden = false;
     },
   };
 }

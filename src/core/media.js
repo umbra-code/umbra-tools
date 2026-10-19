@@ -2,14 +2,15 @@
 import { BINARIES } from './paths.js';
 
 /**
- * What a media file contains, read with ffprobe: `{ duration, hasVideo, hasAudio, width, height }`.
+ * What a media file contains, read with ffprobe:
+ * `{ duration, hasVideo, hasAudio, width, height, sampleRate }`.
  * Throws when the file is not something ffmpeg can read.
  */
 export async function probeMedia(ctx, file) {
   const lines = [];
   const { code } = await ctx.run(
     BINARIES.ffprobe,
-    ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', file],
+    ['-v', 'error', '-show_entries', 'stream=codec_type,width,height,sample_rate:format=duration', '-of', 'json', file],
     { onLine: (line) => lines.push(line) },
   );
   let probe = {};
@@ -23,12 +24,14 @@ export async function probeMedia(ctx, file) {
 
   const streams = probe.streams ?? [];
   const video = streams.find((s) => s.codec_type === 'video');
+  const audio = streams.find((s) => s.codec_type === 'audio');
   return {
     duration,
     hasVideo: Boolean(video),
-    hasAudio: streams.some((s) => s.codec_type === 'audio'),
+    hasAudio: Boolean(audio),
     width: video?.width ?? null,
     height: video?.height ?? null,
+    sampleRate: Number(audio?.sample_rate) || null,
   };
 }
 
