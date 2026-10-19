@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { safeFileName, stripExtension } from './files.js';
 import { parseSource, parseUrl, pickAllowed } from './input.js';
-import { formatTime, parseTime } from './time.js';
+import { formatTime, parseRange, parseTime } from './time.js';
 
 describe('parseTime', () => {
   it('reads seconds, m:ss and h:mm:ss, with decimals', () => {
@@ -15,6 +15,27 @@ describe('parseTime', () => {
   it('rejects anything else', () => {
     for (const value of ['', null, undefined, '-1', '1:60', '1:2:3:4', 'abc', '1e3', '1:23:']) {
       expect(parseTime(value)).toBeNull();
+    }
+  });
+});
+
+describe('parseRange', () => {
+  it('defaults to the whole media', () => {
+    expect(parseRange({})).toEqual({ start: 0, end: null });
+    expect(parseRange({ start: ' ', end: '' })).toEqual({ start: 0, end: null });
+  });
+
+  it('parses both ends', () => {
+    expect(parseRange({ start: '1:00', end: '1:30.5' })).toEqual({ start: 60, end: 90.5 });
+  });
+
+  it('can require an end', () => {
+    expect(() => parseRange({ start: '5' }, { requireEnd: true })).toThrow(/end time/);
+  });
+
+  it('rejects invalid ranges with a 400', () => {
+    for (const body of [{ start: 'soon' }, { end: 'later' }, { start: '10', end: '10' }, { start: '10', end: '4' }]) {
+      expect(() => parseRange(body)).toThrow(expect.objectContaining({ status: 400 }));
     }
   });
 });

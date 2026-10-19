@@ -1,7 +1,7 @@
 // Video converter options and ffmpeg arguments (pure, so they can be tested without ffmpeg).
 import { httpError } from '../../core/errors.js';
 import { pickAllowed } from '../../core/input.js';
-import { parseTime } from '../../core/time.js';
+import { parseRange } from '../../core/time.js';
 
 export const OPTIONS = {
   format: ['mp4', 'webm', 'mkv'],
@@ -38,14 +38,7 @@ const CRF = {
 /** Allowed options, the range in seconds (`end` null = until the end) and the target size. */
 export function parseOptions(body = {}) {
   const options = pickAllowed(body, OPTIONS, DEFAULTS);
-  const start = body.start == null || body.start === '' ? 0 : parseTime(body.start);
-  const end = body.end == null || body.end === '' ? null : parseTime(body.end);
-
-  if (start === null) throw httpError(400, 'Invalid start time; use seconds or m:ss');
-  if (end === null && body.end != null && body.end !== '') {
-    throw httpError(400, 'Invalid end time; use seconds or m:ss');
-  }
-  if (end !== null && end <= start) throw httpError(400, 'The end must be after the start');
+  const { start, end } = parseRange(body);
 
   let targetMb = null;
   if (options.mode === 'size') {

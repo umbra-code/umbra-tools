@@ -1,7 +1,7 @@
 // Video → GIF options and ffmpeg arguments (pure, so they can be tested without ffmpeg).
 import { httpError } from '../../core/errors.js';
 import { pickAllowed } from '../../core/input.js';
-import { parseTime } from '../../core/time.js';
+import { parseRange } from '../../core/time.js';
 
 export const MAX_SECONDS = Number(process.env.GIF_MAX_SECONDS) || 60;
 
@@ -20,12 +20,7 @@ export const DEFAULTS = {
 /** Allowed options plus the clip range, in seconds; throws a 400 when the range is invalid. */
 export function parseOptions(body = {}) {
   const options = pickAllowed(body, OPTIONS, DEFAULTS);
-  const start = body.start == null || body.start === '' ? 0 : parseTime(body.start);
-  const end = parseTime(body.end);
-
-  if (start === null) throw httpError(400, 'Invalid start time; use seconds or m:ss');
-  if (end === null) throw httpError(400, 'Invalid end time; use seconds or m:ss');
-  if (end <= start) throw httpError(400, 'The end must be after the start');
+  const { start, end } = parseRange(body, { requireEnd: true });
   if (end - start > MAX_SECONDS) throw httpError(400, `Clips can be at most ${MAX_SECONDS} seconds long`);
 
   return { ...options, start, end };
