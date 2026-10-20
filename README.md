@@ -281,4 +281,9 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 
 ---
 
+## License
+
+[MIT](LICENSE). umbra tools is provided as is, without warranty of any kind: you use it at your own risk,
+and you are responsible for what you download and convert with it.
+
 Intended for personal use. Respect copyright and each site's terms of service.
