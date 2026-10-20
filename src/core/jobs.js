@@ -125,7 +125,7 @@ async function start(job) {
     await job.tool.run(ctx);
     if (job.status === 'cancelled') return;
 
-    if (job.tool.multipleOutputs) {
+    if (job.tool.multipleOutputs || ctx.multipleOutputs) {
       const files = listFiles(ctx.outDir);
       if (!files.length) throw new Error('The job finished but produced no file');
       job.outputs = files.map((file) => ({ file, size: fs.statSync(file).size }));
@@ -173,6 +173,8 @@ function createContext(job) {
     outDir: path.join(job.dir, 'out'),
     /** Name (without .zip) of the archive a multiple-output job is offered as. */
     archiveName: null,
+    /** Set to true for a run that produces several files (as tools with `multipleOutputs` always do). */
+    multipleOutputs: false,
 
     get cancelled() {
       return job.status === 'cancelled';
