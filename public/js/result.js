@@ -18,6 +18,8 @@ function describe(job) {
       return `analyzing${pass}${pct || '…'}`;
     case 'converting':
       return `converting${pass}${pct || '…'}`;
+    case 'packing':
+      return 'packing the zip…';
     default:
       return `working${pct || '…'}`;
   }
@@ -85,6 +87,9 @@ export function createResult(slot) {
         media.removeAttribute('src');
         media.hidden = true;
       }
+      el('output-list').replaceChildren();
+      el('output-list').hidden = true;
+      el('again').textContent = 'download';
       el('again').hidden = true;
       el('cancel').hidden = false;
       setStatus('starting…');
@@ -132,6 +137,52 @@ export function createResult(slot) {
     showAudio(src) {
       el('output-audio').src = src;
       el('output-audio').hidden = false;
+    },
+
+    /** Changes the text of the main download link (e.g. "download all (.zip)"). */
+    setDownloadLabel(text) {
+      el('again').textContent = text;
+    },
+
+    /**
+     * Lists several results: `{ name, detail, href?, preview?, error? }` each.
+     * Rows with `href` get a download link; `preview` shows a thumbnail.
+     */
+    showFiles(items) {
+      el('output-list').replaceChildren(
+        ...items.map(({ name, detail, href, preview, error }) => {
+          const li = document.createElement('li');
+          li.className = error ? 'failed' : '';
+
+          const thumb = document.createElement('img');
+          thumb.className = 'file-thumb';
+          thumb.alt = '';
+          thumb.loading = 'lazy';
+          if (preview) thumb.src = preview;
+          else thumb.hidden = true;
+
+          const text = document.createElement('div');
+          text.className = 'file-text';
+          const title = document.createElement('p');
+          title.className = 'file-name';
+          title.textContent = name;
+          const meta = document.createElement('p');
+          meta.className = `file-detail ${error ? 'error' : ''}`;
+          meta.textContent = error || detail;
+          text.append(title, meta);
+
+          li.append(thumb, text);
+          if (href) {
+            const link = document.createElement('a');
+            link.href = href;
+            link.download = '';
+            link.textContent = 'download';
+            li.append(link);
+          }
+          return li;
+        }),
+      );
+      el('output-list').hidden = false;
     },
   };
 }

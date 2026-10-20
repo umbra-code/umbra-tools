@@ -178,6 +178,55 @@ form > .group { justify-content: center; }
 /* An audio file in the media player: just the controls, no black picture area. */
 video.audio-only { height: 54px; background: transparent; }
 
+/* Image converter: picked images as a grid of thumbnails. */
+.file-list { display: flex; flex-direction: column; gap: 8px; }
+.file-list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.thumbs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+.thumbs li { position: relative; aspect-ratio: 1; }
+.thumbs img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--border);
+}
+.thumbs .remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.65);
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+.thumbs .remove:hover { background: rgb(0 0 0 / 0.85); }
+
+.slider { display: flex; align-items: center; gap: 12px; }
+.slider input { padding: 0; accent-color: var(--accent); }
+.slider-value {
+  min-width: 3ch;
+  text-align: right;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
 video {
   width: 100%;
   margin-top: 12px;
@@ -352,6 +401,33 @@ video {
   margin: 0;
 }
 .output-audio { width: 100%; }
+
+/* Several results, one row each. */
+.output-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.output-list li { display: flex; align-items: center; gap: 10px; }
+.output-list .file-thumb {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 6px;
+  background: repeating-conic-gradient(var(--border) 0% 25%, transparent 0% 50%) 0 0 / 12px 12px;
+}
+.file-text { flex: 1; min-width: 0; }
+.file-text p { margin: 0; }
+.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-detail { color: var(--muted); font-size: 0.8rem; }
+.file-detail.error { color: var(--error); }
+.output-list a { color: var(--text); font-size: 0.8rem; flex-shrink: 0; }
 
 .bar {
   height: 6px;

@@ -4,8 +4,9 @@ import * as downloader from './tools/downloader.js';
 import * as gif from './tools/gif.js';
 import * as video from './tools/video.js';
 import * as audio from './tools/audio.js';
+import * as image from './tools/image.js';
 
-const tools = { downloader, gif, video, audio };
+const tools = { downloader, gif, video, audio, image };
 const DEFAULT_TOOL = 'downloader';
 
 for (const [id, tool] of Object.entries(tools)) tool.init($(`#tool-${id}`));

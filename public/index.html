@@ -19,6 +19,7 @@
       <button type="button" role="tab" data-tool="gif">🎞 video → gif</button>
       <button type="button" role="tab" data-tool="video">🎬 convert video</button>
       <button type="button" role="tab" data-tool="audio">🎵 convert audio</button>
+      <button type="button" role="tab" data-tool="image">🖼 convert images</button>
     </nav>
 
     <!-- Media downloader -->
@@ -244,6 +245,62 @@
       <div class="result-slot"></div>
     </section>
 
+    <!-- Image converter -->
+    <section id="tool-image" class="tool" role="tabpanel" hidden>
+      <form autocomplete="off">
+        <label class="dropzone" data-dropzone>
+          <input name="files" type="file" accept="image/*" multiple hidden>
+          <span>drop images here or click to choose them</span>
+        </label>
+
+        <div class="file-list" data-file-list hidden>
+          <div class="file-list-head">
+            <span data-file-count></span>
+            <button type="button" class="ghost small" data-clear>clear</button>
+          </div>
+          <ul class="thumbs" data-thumbs></ul>
+        </div>
+
+        <div class="options">
+          <label>format
+            <div class="group" data-key="format">
+              <button type="button" data-value="original" title="Keep each image's format">same</button>
+              <button type="button" data-value="jpg">jpg</button>
+              <button type="button" data-value="png" title="Lossless">png</button>
+              <button type="button" data-value="webp" title="Smaller than jpg, with transparency">webp</button>
+              <button type="button" data-value="avif" title="Smallest; slower, and older apps can't open it">avif</button>
+            </div>
+          </label>
+          <label data-show-when="format!=png">quality
+            <span class="slider">
+              <input name="quality" type="range" min="1" max="100" step="1" aria-label="Quality">
+              <span class="slider-value" data-quality-value></span>
+            </span>
+          </label>
+          <label>max size
+            <div class="group" data-key="maxSize">
+              <button type="button" data-value="original">original</button>
+              <button type="button" data-value="3840">3840</button>
+              <button type="button" data-value="2560">2560</button>
+              <button type="button" data-value="1920">1920</button>
+              <button type="button" data-value="1280">1280</button>
+              <button type="button" data-value="800">800</button>
+              <button type="button" data-value="400">400</button>
+            </div>
+          </label>
+          <label>metadata
+            <div class="group" data-key="metadata">
+              <button type="button" data-value="remove" title="Drops EXIF data such as the camera and the GPS location">remove</button>
+              <button type="button" data-value="keep">keep</button>
+            </div>
+          </label>
+        </div>
+
+        <button type="submit" class="go wide">convert</button>
+      </form>
+      <div class="result-slot"></div>
+    </section>
+
     <!-- File or link, with a player and a trimmer; used by the video and audio tools. -->
     <template id="media-source-template">
       <div class="group" data-key="source" role="group" aria-label="Source">
@@ -294,6 +351,7 @@
         <img class="output" alt="Result preview" hidden>
         <video class="output-video" controls playsinline hidden></video>
         <audio class="output-audio" controls hidden></audio>
+        <ul class="output-list" hidden></ul>
         <div class="status">
           <div class="bar"><div class="bar-fill"></div></div>
           <div class="status-row">
