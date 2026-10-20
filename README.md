@@ -13,7 +13,7 @@ Everything runs on your machine, so files never leave it and there are no upload
 | [Video converter](#video-converter) | ✅ available | Trim, resize, change format/codec and compress, also to a target file size |
 | [Audio converter](#audio-converter) | ✅ available | Convert, trim, downmix and normalize audio, or extract it from a video |
 | [Image converter](#image-converter) | ✅ available | Convert, resize and compress many images at once |
-| Document converter | 🗺️ planned | Convert between common document formats (e.g. to PDF) |
+| [PDF](#pdf) | ✅ available | Merge PDFs, turn images into a PDF, extract pages |
 
 Ideas and order are not set in stone; see [Roadmap](#roadmap).
 
@@ -147,6 +147,22 @@ Drop one or many images (up to 100 at once) and convert them together. Built on 
 
 ---
 
+## PDF
+
+Simple PDF tasks, built on [pdf-lib](https://pdf-lib.js.org/). Everything happens on your machine.
+
+| Mode          | What it does                                     | Options                                        |
+|---------------|--------------------------------------------------|------------------------------------------------|
+| merge         | Joins several PDFs, in the order of the list     | Reorder with ↑ ↓                               |
+| images → pdf  | One image per page                               | Page size: fit the image, A4 or letter         |
+| extract pages | A new PDF with some pages of one PDF             | Pages like `1-3, 5, 8-` (8 to the end), in that order |
+
+- Images of any format the image converter reads work (they are turned upright first); on A4 and letter,
+  wide images get a landscape page and none is enlarged.
+- Password-protected PDFs are not supported.
+
+---
+
 ## Architecture
 
 The app is a small Express server plus a dependency-free frontend. Long-running work runs as
@@ -161,6 +177,7 @@ src/core/                shared by every tool
   process.js             child processes (line-by-line output, killing process trees)
   media.js               ffprobe and ffmpeg helpers (what a file contains, progress, errors)
   archive.js             zips the results of jobs that produce several files
+  sharp.js               sharp, configured for this app (import it from here)
   files.js, time.js      file names, time parsing
   paths.js               binaries and temp locations
 src/tools/               one folder per tool
@@ -170,6 +187,7 @@ src/tools/               one folder per tool
   video/                 video converter
   audio/                 audio converter
   image/                 image converter (sharp)
+  pdf/                   PDF tools (pdf-lib)
 public/                  UI (plain HTML/CSS/JS modules)
   js/main.js             tool menu
   js/media-source.js     file-or-link picker with player and trimmer, shared by the media tools
@@ -191,6 +209,7 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
   - `video`: `start`, `end`, `format`, `codec`, `resolution`, `fps`, `audio`, `mode`, `quality`, `targetMb`
   - `audio`: `start`, `end`, `format`, `bitrate`, `channels`, `normalize`
   - `image`: `format`, `quality`, `maxSize`, `metadata` (several files)
+  - `pdf`: `mode` (`merge`, `images`, `extract`), `pageSize`, `pages` (several files)
 - `GET /api/jobs/:id` → `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage` and `progress`
 - `GET /api/jobs/:id/file` → the finished file (a zip when a job produced several)
 - `GET /api/jobs/:id/outputs/:index` → one of the files of a job that produced several (listed in `outputs`)
@@ -246,7 +265,7 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Video converter (trim, compress, change codec/resolution)
 - [x] Audio converter
 - [x] Image converter
-- [ ] Document converter
+- [x] PDF: merge, images → PDF, extract pages
 - [ ] Downloader: playlists, cookies for age-restricted videos
 
 ---
