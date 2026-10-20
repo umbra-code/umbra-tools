@@ -1,4 +1,4 @@
-// Tool menu: each tab shows one tool; the choice is kept in the URL hash (#gif).
+// Tool menu: each entry of the sidebar shows one tool; the choice is kept in the URL hash (#gif).
 import { $, $$ } from './dom.js';
 import * as downloader from './tools/downloader.js';
 import * as gif from './tools/gif.js';
@@ -16,13 +16,19 @@ function select(id) {
   if (!tools[id]) id = DEFAULT_TOOL;
   for (const tab of $$('[data-tool]')) tab.setAttribute('aria-selected', String(tab.dataset.tool === id));
   for (const other of Object.keys(tools)) $(`#tool-${other}`).hidden = other !== id;
+  const name = $(`#tool-${id} .tool-head h1`)?.textContent;
+  document.title = name ? `${name} · umbra tools` : 'umbra tools';
 }
 
 for (const tab of $$('[data-tool]')) {
   tab.addEventListener('click', () => {
     history.replaceState(null, '', `#${tab.dataset.tool}`);
     select(tab.dataset.tool);
+    window.scrollTo({ top: 0 });
   });
 }
+
+// The logo links to #downloader; back/forward and typed hashes work too.
+window.addEventListener('hashchange', () => select(location.hash.slice(1)));
 
 select(location.hash.slice(1));
