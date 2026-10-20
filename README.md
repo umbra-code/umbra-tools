@@ -12,7 +12,7 @@ Everything runs on your machine, so files never leave it and there are no upload
 | [Video → GIF](#video--gif) | ✅ available | Turn a time range of a video file or link into a GIF or animated WebP |
 | [Video converter](#video-converter) | ✅ available | Trim, resize, change format/codec and compress, also to a target file size |
 | [Audio converter](#audio-converter) | ✅ available | Convert, trim, downmix and normalize audio, or extract it from a video |
-| Image converter | 🗺️ planned | Convert between png, jpg, webp, avif…; resize and compress |
+| [Image converter](#image-converter) | ✅ available | Convert, resize and compress many images at once |
 | Document converter | 🗺️ planned | Convert between common document formats (e.g. to PDF) |
 
 Ideas and order are not set in stone; see [Roadmap](#roadmap).
@@ -35,6 +35,7 @@ npm start     # open http://localhost:3000
 | `MAX_CONCURRENT`           | `2`         | Jobs that run at the same time                      |
 | `FILE_TTL_MINUTES`         | `15`        | How long finished files are kept                    |
 | `MAX_UPLOAD_MB`            | `2048`      | Largest file that can be uploaded                   |
+| `MAX_FILES`                | `100`       | Most files that can be uploaded at once             |
 | `GIF_MAX_SECONDS`          | `60`        | Longest clip Video → GIF accepts                    |
 | `YTDLP_PATH`, `FFMPEG_DIR` | `bin/`      | Use your own binaries                               |
 
@@ -127,6 +128,25 @@ Pick an audio or video file, or a link, optionally trim it, and convert its audi
 
 ---
 
+## Image converter
+
+Drop one or many images (up to 100 at once) and convert them together. Built on [sharp](https://sharp.pixelplumbing.com/).
+
+| Option   | Values                              | Notes                                                        |
+|----------|-------------------------------------|--------------------------------------------------------------|
+| format   | same, jpg, png, webp, avif          | "same" keeps each image's format; png is lossless            |
+| quality  | 1–100                               | For jpg, webp and avif                                       |
+| max size | original, 3840 … 400 px             | Longest side; the aspect ratio is kept and nothing is enlarged |
+| metadata | remove, keep                        | Removing drops EXIF data such as the camera and GPS location |
+
+- Phone photos stored sideways are turned upright using their EXIF orientation.
+- Transparent areas become white when converting to jpg, which has no transparency.
+- Animated GIFs stay animated as webp; other formats keep the first frame.
+- Each image is listed with its size before and after; download them one by one or all together as a zip.
+- A file that cannot be read does not stop the others. HEIC photos (iPhone) are not supported yet.
+
+---
+
 ## Architecture
 
 The app is a small Express server plus a dependency-free frontend. Long-running work runs as
@@ -140,6 +160,7 @@ src/core/                shared by every tool
   input.js               option allowlists, links and uploaded files
   process.js             child processes (line-by-line output, killing process trees)
   media.js               ffprobe and ffmpeg helpers (what a file contains, progress, errors)
+  archive.js             zips the results of jobs that produce several files
   files.js, time.js      file names, time parsing
   paths.js               binaries and temp locations
 src/tools/               one folder per tool
@@ -148,6 +169,7 @@ src/tools/               one folder per tool
   gif/                   video → GIF
   video/                 video converter
   audio/                 audio converter
+  image/                 image converter (sharp)
 public/                  UI (plain HTML/CSS/JS modules)
   js/main.js             tool menu
   js/media-source.js     file-or-link picker with player and trimmer, shared by the media tools
@@ -162,21 +184,25 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
 
 ### API
 
-- `POST /api/jobs` → creates a job and returns its state. Send JSON with a `url`, or multipart with a `file`,
-  plus `tool` (`downloader` by default) and the tool's options:
+- `POST /api/jobs` → creates a job and returns its state. Send JSON with a `url`, or multipart with one or more
+  `file` fields, plus `tool` (`downloader` by default) and the tool's options:
   - `downloader`: `mode`, `videoFormat`, `quality`, `audioFormat`, `audioBitrate`
   - `gif`: `start`, `end`, `fps`, `width`, `format`
   - `video`: `start`, `end`, `format`, `codec`, `resolution`, `fps`, `audio`, `mode`, `quality`, `targetMb`
   - `audio`: `start`, `end`, `format`, `bitrate`, `channels`, `normalize`
+  - `image`: `format`, `quality`, `maxSize`, `metadata` (several files)
 - `GET /api/jobs/:id` → `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage` and `progress`
-- `GET /api/jobs/:id/file` → the finished file
+- `GET /api/jobs/:id/file` → the finished file (a zip when a job produced several)
+- `GET /api/jobs/:id/outputs/:index` → one of the files of a job that produced several (listed in `outputs`)
 - `DELETE /api/jobs/:id` → cancels the job
 - `POST /api/info` `{ url }` → title, uploader, duration, thumbnail and available resolutions of a link
 
 ### Adding a tool
 
 1. Create `src/tools/<tool>/index.js` exporting `{ id, accepts, parseOptions(body), run(ctx) }`:
-   - `accepts`: `['url']`, `['file']` or both.
+   - `accepts`: what it takes: `'url'`, `'file'` (exactly one, `ctx.file`) and/or `'files'` (one or more, `ctx.files`).
+   - `multipleOutputs: true` when it can produce several files: each one is offered on its own and all of them
+     as a zip (named after `ctx.archiveName`). Otherwise the largest file in `ctx.outDir` is the result.
    - `parseOptions` validates the request (use `pickAllowed` for allowlists; throw `httpError(400, …)`).
    - `run(ctx)` writes its result into `ctx.outDir`, using `ctx.run()` for processes (so cancelling kills them)
      and `ctx.stage()` / `ctx.progress()` to report progress. Intermediate files go in `ctx.workDir`.
@@ -219,7 +245,7 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Video → GIF / animated WebP
 - [x] Video converter (trim, compress, change codec/resolution)
 - [x] Audio converter
-- [ ] Image converter
+- [x] Image converter
 - [ ] Document converter
 - [ ] Downloader: playlists, cookies for age-restricted videos
 
