@@ -3,6 +3,7 @@ import audio from './audio/index.js';
 import downloader from './downloader/index.js';
 import gif from './gif/index.js';
 import image from './image/index.js';
+import pdf from './pdf/index.js';
 import video from './video/index.js';
 
-export const tools = Object.fromEntries([downloader, gif, video, audio, image].map((tool) => [tool.id, tool]));
+export const tools = Object.fromEntries([downloader, gif, video, audio, image, pdf].map((tool) => [tool.id, tool]));

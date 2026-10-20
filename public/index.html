@@ -20,6 +20,7 @@
       <button type="button" role="tab" data-tool="video">🎬 convert video</button>
       <button type="button" role="tab" data-tool="audio">🎵 convert audio</button>
       <button type="button" role="tab" data-tool="image">🖼 convert images</button>
+      <button type="button" role="tab" data-tool="pdf">📄 pdf</button>
     </nav>
 
     <!-- Media downloader -->
@@ -297,6 +298,44 @@
         </div>
 
         <button type="submit" class="go wide">convert</button>
+      </form>
+      <div class="result-slot"></div>
+    </section>
+
+    <!-- PDF -->
+    <section id="tool-pdf" class="tool" role="tabpanel" hidden>
+      <form autocomplete="off">
+        <div class="group" data-key="mode" role="group" aria-label="Mode">
+          <button type="button" data-value="merge">merge</button>
+          <button type="button" data-value="images">images → pdf</button>
+          <button type="button" data-value="extract">extract pages</button>
+        </div>
+
+        <label class="dropzone" data-dropzone>
+          <input name="files" type="file" multiple hidden>
+          <span data-drop-label></span>
+        </label>
+
+        <ol class="file-rows" data-file-rows hidden></ol>
+        <p class="hint" data-files-hint hidden></p>
+
+        <div class="options">
+          <label data-show-when="mode=images">page size
+            <div class="group" data-key="pageSize">
+              <button type="button" data-value="fit" title="Each page is the size of its image">fit image</button>
+              <button type="button" data-value="a4">A4</button>
+              <button type="button" data-value="letter">letter</button>
+            </div>
+          </label>
+          <label data-show-when="mode=extract">pages
+            <span class="time-input pages-input">
+              <input name="pages" placeholder="1-3, 5, 8-" aria-label="Pages to extract">
+            </span>
+            <span class="hint">single pages and ranges, separated by commas; "8-" means 8 to the end</span>
+          </label>
+        </div>
+
+        <button type="submit" class="go wide">create pdf</button>
       </form>
       <div class="result-slot"></div>
     </section>

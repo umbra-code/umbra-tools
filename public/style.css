@@ -218,6 +218,37 @@ video.audio-only { height: 54px; background: transparent; }
 }
 .thumbs .remove:hover { background: rgb(0 0 0 / 0.85); }
 
+/* PDF tool: files as ordered rows. */
+.file-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  counter-reset: file;
+}
+.file-rows li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  counter-increment: file;
+}
+.file-rows li::before {
+  content: counter(file);
+  min-width: 2ch;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.file-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-row-size { color: var(--muted); font-size: 0.8rem; padding-right: 4px; }
+.file-rows button:disabled { opacity: 0.3; cursor: default; }
+.pages-input { width: 220px; }
+
 .slider { display: flex; align-items: center; gap: 12px; }
 .slider input { padding: 0; accent-color: var(--accent); }
 .slider-value {
