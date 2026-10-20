@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { buildDownloadArgs, cleanError, DEFAULTS, formatArgs, isForbidden, sanitizeOptions } from './ytdlp.js';
+import {
+  buildDownloadArgs,
+  buildPlaylistArgs,
+  cleanError,
+  DEFAULTS,
+  formatArgs,
+  isForbidden,
+  MAX_PLAYLIST_ITEMS,
+  sanitizeOptions,
+} from './ytdlp.js';
 
 const URL = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
 
@@ -11,7 +20,7 @@ const argsFor = (options, { client, pinned, extra } = {}) =>
 
 describe('sanitizeOptions', () => {
   it('keeps allowed values', () => {
-    const options = { mode: 'audio', videoFormat: 'mkv', quality: '720', audioFormat: 'flac', audioBitrate: '128' };
+    const options = { mode: 'audio', videoFormat: 'mkv', quality: '720', audioFormat: 'flac', audioBitrate: '128', playlist: 'all' };
     expect(sanitizeOptions(options)).toEqual(options);
   });
 
@@ -49,6 +58,32 @@ describe('buildDownloadArgs', () => {
 
   it('pins a single combined format as is', () => {
     expect(lastValue(argsFor({}, { pinned: '18' }), '-f')).toBe('18');
+  });
+
+  it('downloads a single video even from a playlist link', () => {
+    const args = argsFor({});
+    expect(args).toContain('--no-playlist');
+    expect(lastValue(args, '--playlist-items')).toBe('1');
+  });
+});
+
+describe('buildPlaylistArgs', () => {
+  const args = buildPlaylistArgs(URL, '/tmp/job', { format: formatArgs(sanitizeOptions({ mode: 'audio' })) });
+
+  it('downloads the playlist up to the limit, skipping videos that fail', () => {
+    expect(args).toContain('--yes-playlist');
+    expect(args).toContain('--ignore-errors');
+    expect(lastValue(args, '--playlist-items')).toBe(`1:${MAX_PLAYLIST_ITEMS}`);
+    expect(args).not.toContain('--no-playlist');
+  });
+
+  it('numbers the files in playlist order', () => {
+    expect(lastValue(args, '-o')).toMatch(/^%\(playlist_index\)03d - /);
+  });
+
+  it('applies the format selection and ends with the URL after "--"', () => {
+    expect(lastValue(args, '--audio-format')).toBe('mp3');
+    expect(args.slice(-2)).toEqual(['--', URL]);
   });
 });
 

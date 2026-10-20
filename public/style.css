@@ -160,6 +160,14 @@ form > .group { justify-content: center; }
   font-size: 0.8rem;
 }
 
+/* Downloader: what the pasted link is, before downloading. */
+.link-preview {
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
 /* --- Video → GIF ------------------------------------------------------------------- */
 
 .dropzone {

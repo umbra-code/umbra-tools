@@ -35,8 +35,9 @@ function findJob(req) {
 /** busboy decodes multipart file names as latin1; browsers send UTF-8. */
 const decodeFileName = (name) => Buffer.from(name, 'latin1').toString('utf8');
 
+// `playlist: true` describes the playlist a video link belongs to, instead of the video.
 app.post('/api/info', async (req, res) => {
-  res.json(await getInfo(parseUrl(req.body?.url)));
+  res.json(await getInfo(parseUrl(req.body?.url), { playlist: req.body?.playlist === true }));
 });
 
 // JSON with a `url`, or multipart with one or more `file` fields. Without `tool` it is the

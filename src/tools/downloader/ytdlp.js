@@ -1,12 +1,13 @@
-// yt-dlp integration: metadata lookup, argument building and downloads with retries.
-// Used by the downloader and by any tool that accepts a link (e.g. video → GIF).
+// yt-dlp integration: metadata lookup, argument building and downloads (single videos with
+// retries, and playlists). Used by the downloader and by any tool that accepts a link.
 import { BINARIES } from '../../core/paths.js';
 import { pickAllowed } from '../../core/input.js';
 import { killTree, runProcess } from '../../core/process.js';
 
+export const MAX_PLAYLIST_ITEMS = Number(process.env.MAX_PLAYLIST_ITEMS) || 50;
+
 const BASE_ARGS = [
   '--ignore-config',
-  '--no-playlist',
   '--no-warnings',
   '--ffmpeg-location', BINARIES.ffmpegDir,
   // YouTube needs a JS runtime to solve its challenges; reuse the running Node.
@@ -21,6 +22,8 @@ export const OPTIONS = {
   quality: ['max', '2160', '1440', '1080', '720', '480', '360', '240', '144'],
   audioFormat: ['mp3', 'm4a', 'opus', 'ogg', 'wav', 'flac', 'original'],
   audioBitrate: ['320', '256', '192', '128', '96'],
+  // For a link to a video inside a playlist: just that video, or the whole playlist.
+  playlist: ['video', 'all'],
 };
 
 export const DEFAULTS = {
@@ -29,6 +32,7 @@ export const DEFAULTS = {
   quality: '1080',
   audioFormat: 'mp3',
   audioBitrate: '320',
+  playlist: 'video',
 };
 
 /** Validates client options against the allowlist, falling back to defaults. */
@@ -44,7 +48,16 @@ export function cleanError(stderr) {
     .slice(0, 300);
 }
 
-export async function getInfo(url, timeoutMs = 60_000) {
+/** The best thumbnail URL in yt-dlp's info (or its first entry's, for playlists). */
+const thumbnailOf = (info) =>
+  info.thumbnail || info.thumbnails?.at(-1)?.url || info.entries?.[0]?.thumbnails?.at(-1)?.url || null;
+
+/**
+ * What a link points to, without downloading it. A video gives `{ type: 'video', title, duration,
+ * heights… }`; a playlist gives `{ type: 'playlist', title, count… }`. With `playlist`, a link to a
+ * video inside a playlist describes the playlist instead of the video.
+ */
+export async function getInfo(url, { playlist = false, timeoutMs = 60_000 } = {}) {
   let child;
   let timedOut = false;
   const lines = [];
@@ -53,9 +66,10 @@ export async function getInfo(url, timeoutMs = 60_000) {
     killTree(child);
   }, timeoutMs);
 
+  const scope = playlist ? '--yes-playlist' : '--no-playlist';
   let result;
   try {
-    result = await runProcess(BINARIES.ytdlp, [...BASE_ARGS, '-J', '--flat-playlist', '--', url], {
+    result = await runProcess(BINARIES.ytdlp, [...BASE_ARGS, scope, '-J', '--flat-playlist', '--', url], {
       env: ENV,
       track: (c) => (child = c),
       onLine: (line) => lines.push(line),
@@ -71,7 +85,17 @@ export async function getInfo(url, timeoutMs = 60_000) {
 
   const info = JSON.parse(lines.join('\n'));
   if (info._type === 'playlist') {
-    throw new Error('Playlists are not supported yet; use a single video link');
+    return {
+      type: 'playlist',
+      id: info.id,
+      title: info.title,
+      uploader: info.uploader || info.channel || info.uploader_id || null,
+      count: info.playlist_count ?? info.entries?.length ?? null,
+      maxItems: MAX_PLAYLIST_ITEMS,
+      thumbnail: thumbnailOf(info),
+      site: info.extractor_key || info.extractor,
+      url: info.webpage_url || url,
+    };
   }
   const heights = [
     ...new Set(
@@ -82,11 +106,12 @@ export async function getInfo(url, timeoutMs = 60_000) {
   ].sort((a, b) => b - a);
 
   return {
+    type: 'video',
     id: info.id,
     title: info.title,
     uploader: info.uploader || info.channel || info.uploader_id || null,
     duration: info.duration ?? null,
-    thumbnail: info.thumbnail || null,
+    thumbnail: thumbnailOf(info),
     site: info.extractor_key || info.extractor,
     url: info.webpage_url || url,
     heights,
@@ -125,6 +150,10 @@ function pinFormat(formatIds) {
 export function buildDownloadArgs(url, dir, { client = [], format = [], extra = [], pinned = null } = {}) {
   return [
     ...client,
+    // A link to a video inside a playlist means just that video here; see buildPlaylistArgs.
+    // A link to a playlist alone would still download all of it, so cap it at its first video.
+    '--no-playlist',
+    '--playlist-items', '1',
     '--newline',
     '--progress',
     '--progress-template', PROGRESS_TEMPLATE,
@@ -233,4 +262,71 @@ export async function download(ctx, url, { dir, format = [], extra = [] }) {
         : message,
     );
   }
+}
+
+/**
+ * yt-dlp arguments to download up to `maxItems` videos of the playlist at `url` into `dir`,
+ * named "001 - Title [id].ext" so they keep the playlist's order. A video that fails
+ * (private, removed…) is skipped instead of stopping the rest.
+ */
+export function buildPlaylistArgs(url, dir, { format = [], maxItems = MAX_PLAYLIST_ITEMS } = {}) {
+  return [
+    '--yes-playlist',
+    '--ignore-errors',
+    '--playlist-items', `1:${maxItems}`,
+    '--newline',
+    '--progress',
+    '--progress-template', PROGRESS_TEMPLATE,
+    '-P', dir,
+    '-o', '%(playlist_index)03d - %(title).100B [%(id)s].%(ext)s',
+    '--embed-metadata',
+    ...format,
+    '--',
+    url,
+  ];
+}
+
+/**
+ * Downloads a playlist into `dir` as part of a job. Progress covers the whole playlist
+ * (`item`/`items` say which video it is on). Resolves with `{ title, items, code, stderr }`;
+ * it does not throw when some videos fail, so the caller decides from what was downloaded.
+ */
+export async function downloadPlaylist(ctx, url, { dir, format = [] }) {
+  const state = { title: null, item: 0, items: null, part: 0, parts: 1 };
+  ctx.set({ attempt: 0, item: 0, items: null, part: 0, parts: 1 });
+  ctx.stage('downloading', 0);
+
+  const overall = (fraction) =>
+    state.items ? Math.min((state.item - 1 + ((state.part || 1) - 1 + fraction) / state.parts) / state.items, 1) : null;
+
+  const { code, stderr } = await ctx.run(BINARIES.ytdlp, [...BASE_ARGS, ...buildPlaylistArgs(url, dir, { format })], {
+    env: ENV,
+    onLine: (line) => {
+      if (line.startsWith('PROGRESS|')) {
+        const [, downloaded, total, estimate] = line.split('|').map(Number);
+        const size = total || estimate;
+        if (size && downloaded) ctx.progress(overall(Math.min(downloaded / size, 1)));
+        return;
+      }
+      const playlist = line.match(/^\[download\] Downloading playlist: (.+)$/);
+      if (playlist) {
+        state.title = playlist[1].trim();
+        return;
+      }
+      const item = line.match(/Downloading item (\d+) of (\d+)/);
+      if (item) {
+        Object.assign(state, { item: Number(item[1]), items: Number(item[2]), part: 0, parts: 1 });
+        ctx.set({ item: state.item, items: state.items, part: 0, parts: 1 });
+        ctx.progress(overall(0));
+        return;
+      }
+      const formats = line.match(/Downloading \d+ format\(s\): (\S+)/);
+      if (formats) {
+        state.parts = formats[1].split('+').length;
+        return;
+      }
+      if (line.startsWith('[download] Destination:')) state.part = Math.min(state.part + 1, state.parts);
+    },
+  });
+  return { title: state.title, items: state.items, code, stderr };
 }

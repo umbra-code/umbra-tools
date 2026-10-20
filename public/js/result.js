@@ -9,6 +9,7 @@ function describe(job) {
   const pass = job.passes > 1 ? ` (pass ${job.pass}/${job.passes})` : '';
   switch (job.stage) {
     case 'downloading': {
+      if (job.items) return `downloading video ${Math.max(job.item, 1)}/${job.items}${pct}`;
       const part = job.parts > 1 ? ` (part ${Math.max(job.part, 1)}/${job.parts})` : '';
       return `downloading${part}${pct}${retry}`;
     }

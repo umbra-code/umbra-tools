@@ -225,7 +225,9 @@ export function createMediaSource(
     if (state.source === 'url') showSource();
     try {
       const info = await api('/api/info', { method: 'POST', body: { url }, signal: infoAbort.signal });
-      if (info.duration) {
+      if (info.type === 'playlist') {
+        hints.url = ['That is a playlist; paste the link of one of its videos', 'warn'];
+      } else if (info.duration) {
         sources.url = {
           duration: info.duration,
           start: 0,
