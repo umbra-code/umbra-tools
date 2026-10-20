@@ -64,6 +64,9 @@ for downloading and ffmpeg for merging and converting.
   order. For a video that belongs to a playlist, pick "this video" or "whole playlist". Each video can be
   downloaded on its own, or all of them as a zip named after the playlist. Videos that cannot be downloaded
   (private, removed…) are skipped and counted.
+- **No signed-in downloads**: age-restricted, private and members-only videos cannot be downloaded, and the
+  error says so. On purpose: it would need your account's cookies, and YouTube can flag accounts used for
+  automated downloads (accounts are tied to your Google identity, so a secondary one does not fully protect you).
 
 **Maintenance:** sites change often and yt-dlp is updated to keep up. If downloads start failing:
 
@@ -274,7 +277,7 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Image converter
 - [x] PDF: merge, images → PDF, extract pages
 - [x] Downloader: playlists
-- [ ] Downloader: cookies for age-restricted videos
+- ~~Downloader: cookies for age-restricted videos~~ (left out on purpose, see [Media downloader](#media-downloader))
 
 ---
 
