@@ -1,14 +1,16 @@
 // In-memory job queue shared by every tool. Each job gets its own temp directory:
-//   input/  the uploaded file, if any
+//   input/  the uploaded files, if any
 //   work/   intermediate files (removed when the job ends)
-//   out/    the result; its largest file is what the user downloads
+//   out/    the result: its largest file is what the user downloads, or, for tools with
+//           `multipleOutputs`, every file in it (also offered together as a zip)
 // A tool only implements `run(ctx)`; queuing, progress, cancellation and cleanup live here.
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { TEMP_ROOT, UPLOAD_DIR } from './paths.js';
 import { killTree, runProcess } from './process.js';
-import { largestFile } from './files.js';
+import { largestFile, listFiles, safeFileName } from './files.js';
+import { zipFiles } from './archive.js';
 import { httpError } from './errors.js';
 
 const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT) || 2;
@@ -32,18 +34,23 @@ export function getJob(id) {
   return jobs.get(id);
 }
 
-/** `input` is `{ url }` or `{ file: { path, name } }`, plus the tool's parsed `options`. */
+/**
+ * `input` is `{ url }`, `{ file }` or `{ files }` (files as `{ path, name }`), plus the tool's
+ * parsed `options`.
+ */
 export function createJob(tool, input) {
   if (jobs.size >= MAX_JOBS) throw httpError(429, 'The server is busy, try again in a few minutes');
 
   const dir = fs.mkdtempSync(path.join(TEMP_ROOT, 'job-'));
-  if (input.file) {
-    // Move the upload into the job so it is cleaned up with it.
-    const target = path.join(dir, 'input', path.basename(input.file.path));
-    fs.mkdirSync(path.dirname(target));
-    fs.renameSync(input.file.path, target);
-    input = { ...input, file: { ...input.file, path: target } };
-  }
+  // Move the uploads into the job so they are cleaned up with it.
+  const moveIn = (file) => {
+    const target = path.join(dir, 'input', path.basename(file.path));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.renameSync(file.path, target);
+    return { ...file, path: target };
+  };
+  if (input.file) input = { ...input, file: moveIn(input.file) };
+  if (input.files) input = { ...input, files: input.files.map(moveIn) };
 
   const job = {
     id: randomUUID(),
@@ -57,6 +64,7 @@ export function createJob(tool, input) {
     error: null,
     file: null,
     size: null,
+    outputs: null,
     children: new Set(),
     cleanupTimer: null,
   };
@@ -94,8 +102,13 @@ export function publicJob(job) {
     error: job.error,
     filename: job.file ? path.basename(job.file) : null,
     size: job.size,
+    // Each result of a multiple-output job, downloadable at /api/jobs/:id/outputs/:index.
+    outputs: job.outputs?.map(({ file, size }) => ({ name: path.basename(file), size })) ?? null,
   };
 }
+
+/** The path of a multiple-output job's result by index, or null. */
+export const jobOutput = (job, index) => job.outputs?.[index]?.file ?? null;
 
 function pump() {
   while (active < MAX_CONCURRENT && queue.length) start(queue.shift());
@@ -112,10 +125,22 @@ async function start(job) {
     await job.tool.run(ctx);
     if (job.status === 'cancelled') return;
 
-    const file = largestFile(ctx.outDir);
-    if (!file) throw new Error('The job finished but produced no file');
-    job.file = file;
-    job.size = fs.statSync(file).size;
+    if (job.tool.multipleOutputs) {
+      const files = listFiles(ctx.outDir);
+      if (!files.length) throw new Error('The job finished but produced no file');
+      job.outputs = files.map((file) => ({ file, size: fs.statSync(file).size }));
+      if (files.length === 1) {
+        job.file = files[0];
+      } else {
+        ctx.stage('packing');
+        job.file = path.join(job.dir, `${safeFileName(ctx.archiveName ?? job.tool.id)}.zip`);
+        await zipFiles(files, job.file);
+      }
+    } else {
+      job.file = largestFile(ctx.outDir);
+      if (!job.file) throw new Error('The job finished but produced no file');
+    }
+    job.size = fs.statSync(job.file).size;
     job.status = 'done';
     job.stage = null;
     job.progress = 1;
@@ -142,9 +167,12 @@ function createContext(job) {
   return {
     url: job.input.url,
     file: job.input.file,
+    files: job.input.files,
     options: job.input.options,
     workDir: path.join(job.dir, 'work'),
     outDir: path.join(job.dir, 'out'),
+    /** Name (without .zip) of the archive a multiple-output job is offered as. */
+    archiveName: null,
 
     get cancelled() {
       return job.status === 'cancelled';

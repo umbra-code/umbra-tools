@@ -25,13 +25,17 @@ export function parseUrl(value) {
 }
 
 /**
- * The job's source: an uploaded file when there is one, a link otherwise.
- * `accepts` lists what the tool supports ('url', 'file').
+ * The job's source: the uploaded files when there are any, a link otherwise.
+ * `accepts` lists what the tool supports: 'url', 'file' (exactly one) and/or 'files' (one or more).
+ * Returns `{ url }`, `{ file }` or `{ files }`, files as `{ path, name }`.
  */
-export function parseSource(body, file, accepts) {
-  if (file) {
+export function parseSource(body, files = [], accepts) {
+  const uploaded = files.map((file) => ({ path: file.path, name: file.originalname }));
+  if (uploaded.length) {
+    if (accepts.includes('files')) return { files: uploaded };
     if (!accepts.includes('file')) throw httpError(400, 'This tool works with links, not files');
-    return { file: { path: file.path, name: file.originalname } };
+    if (uploaded.length > 1) throw httpError(400, 'This tool works with one file at a time');
+    return { file: uploaded[0] };
   }
   if (!accepts.includes('url')) throw httpError(400, 'Choose a file to upload');
   return { url: parseUrl(body?.url) };

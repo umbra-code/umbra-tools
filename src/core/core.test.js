@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { safeFileName, stripExtension } from './files.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { listFiles, safeFileName, stripExtension, uniquePath } from './files.js';
 import { parseSource, parseUrl, pickAllowed } from './input.js';
 import { formatTime, parseRange, parseTime } from './time.js';
 
@@ -71,20 +74,32 @@ describe('parseUrl', () => {
 
 describe('parseSource', () => {
   const file = { path: '/tmp/upload', originalname: 'clip.mp4' };
+  const other = { path: '/tmp/upload2', originalname: 'other.mp4' };
 
   it('prefers the uploaded file', () => {
-    expect(parseSource({ url: 'https://example.com' }, file, ['url', 'file'])).toEqual({
+    expect(parseSource({ url: 'https://example.com' }, [file], ['url', 'file'])).toEqual({
       file: { path: '/tmp/upload', name: 'clip.mp4' },
     });
   });
 
+  it('gives tools that take several files all of them', () => {
+    expect(parseSource({}, [file, other], ['files'])).toEqual({
+      files: [
+        { path: '/tmp/upload', name: 'clip.mp4' },
+        { path: '/tmp/upload2', name: 'other.mp4' },
+      ],
+    });
+  });
+
   it('falls back to the link', () => {
+    expect(parseSource({ url: 'https://example.com' }, [], ['url'])).toEqual({ url: 'https://example.com/' });
     expect(parseSource({ url: 'https://example.com' }, undefined, ['url'])).toEqual({ url: 'https://example.com/' });
   });
 
   it('rejects sources the tool does not accept', () => {
-    expect(() => parseSource({}, file, ['url'])).toThrow(expect.objectContaining({ status: 400 }));
-    expect(() => parseSource({ url: 'https://example.com' }, undefined, ['file'])).toThrow(/file/);
+    expect(() => parseSource({}, [file], ['url'])).toThrow(expect.objectContaining({ status: 400 }));
+    expect(() => parseSource({}, [file, other], ['url', 'file'])).toThrow(/one file/);
+    expect(() => parseSource({ url: 'https://example.com' }, [], ['file'])).toThrow(/file/);
   });
 });
 
@@ -102,6 +117,26 @@ describe('safeFileName', () => {
 
   it('caps the length', () => {
     expect(safeFileName('x'.repeat(300))).toHaveLength(120);
+  });
+});
+
+describe('uniquePath and listFiles', () => {
+  it('numbers names that are already taken and lists files by name', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'umbra-test-'));
+    try {
+      const first = uniquePath(dir, 'photo', 'webp');
+      fs.writeFileSync(first, '');
+      const second = uniquePath(dir, 'photo', 'webp');
+      fs.writeFileSync(second, '');
+      fs.writeFileSync(path.join(dir, 'video.mp4.part'), '');
+
+      expect(path.basename(first)).toBe('photo.webp');
+      expect(path.basename(second)).toBe('photo (2).webp');
+      expect(listFiles(dir).map((f) => path.basename(f))).toEqual(['photo (2).webp', 'photo.webp']);
+      expect(listFiles(path.join(dir, 'missing'))).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

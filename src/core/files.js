@@ -27,3 +27,24 @@ export function safeFileName(name, fallback = 'output') {
 
 /** "clip.final.mp4" → "clip.final" */
 export const stripExtension = (name) => path.parse(String(name ?? '')).name;
+
+/** Files in `dir` (not partial downloads), sorted by name; empty when `dir` does not exist. */
+export function listFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => !/\.(part|ytdl|temp)$/i.test(f))
+    .sort((a, b) => a.localeCompare(b))
+    .map((f) => path.join(dir, f))
+    .filter((f) => fs.statSync(f).isFile());
+}
+
+/**
+ * A path in `dir` for `name` + `ext` that is not taken yet: "photo.webp", then
+ * "photo (2).webp"… so outputs of files with the same name do not overwrite each other.
+ */
+export function uniquePath(dir, name, ext) {
+  let candidate = path.join(dir, `${name}.${ext}`);
+  for (let i = 2; fs.existsSync(candidate); i++) candidate = path.join(dir, `${name} (${i}).${ext}`);
+  return candidate;
+}

@@ -5,19 +5,20 @@ import multer from 'multer';
 import { ROOT, UPLOAD_DIR } from './core/paths.js';
 import { httpError } from './core/errors.js';
 import { parseSource, parseUrl } from './core/input.js';
-import { cancelJob, createJob, getJob, initTempDir, publicJob, shutdown } from './core/jobs.js';
+import { cancelJob, createJob, getJob, initTempDir, jobOutput, publicJob, shutdown } from './core/jobs.js';
 import { tools } from './tools/index.js';
 import { getInfo } from './tools/downloader/ytdlp.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
 const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 2048;
+const MAX_FILES = Number(process.env.MAX_FILES) || 100;
 
 initTempDir();
 
 const upload = multer({
   dest: UPLOAD_DIR,
-  limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 },
+  limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: MAX_FILES },
 });
 
 const app = express();
@@ -38,21 +39,22 @@ app.post('/api/info', async (req, res) => {
   res.json(await getInfo(parseUrl(req.body?.url)));
 });
 
-// JSON with a `url`, or multipart with a `file`. Without `tool` it is the downloader,
-// as in v1.0.
-app.post('/api/jobs', upload.single('file'), (req, res) => {
+// JSON with a `url`, or multipart with one or more `file` fields. Without `tool` it is the
+// downloader, as in v1.0.
+app.post('/api/jobs', upload.array('file', MAX_FILES), (req, res) => {
+  const files = req.files ?? [];
   try {
     const tool = tools[req.body?.tool || 'downloader'];
     if (!tool) throw httpError(400, 'Unknown tool');
-    if (req.file) req.file.originalname = decodeFileName(req.file.originalname);
+    for (const file of files) file.originalname = decodeFileName(file.originalname);
 
     const job = createJob(tool, {
-      ...parseSource(req.body, req.file, tool.accepts),
+      ...parseSource(req.body, files, tool.accepts),
       options: tool.parseOptions(req.body ?? {}),
     });
     res.status(201).json(publicJob(job));
   } catch (err) {
-    if (req.file) fs.rm(req.file.path, { force: true }, () => {});
+    for (const file of files) fs.rm(file.path, { force: true }, () => {});
     throw err;
   }
 });
@@ -67,6 +69,13 @@ app.get('/api/jobs/:id/file', (req, res) => {
   res.download(job.file, path.basename(job.file));
 });
 
+// One result of a job that produced several files (the whole set is /file, as a zip).
+app.get('/api/jobs/:id/outputs/:index', (req, res) => {
+  const file = jobOutput(findJob(req), Number(req.params.index));
+  if (!file) throw httpError(404, 'File not found');
+  res.download(file, path.basename(file));
+});
+
 app.delete('/api/jobs/:id', (req, res) => {
   cancelJob(findJob(req));
   res.status(204).end();
@@ -74,8 +83,12 @@ app.delete('/api/jobs/:id', (req, res) => {
 
 app.use((err, req, res, _next) => {
   if (err instanceof multer.MulterError) {
-    const tooBig = err.code === 'LIMIT_FILE_SIZE';
-    err = httpError(tooBig ? 413 : 400, tooBig ? `Files can be at most ${MAX_UPLOAD_MB} MB` : err.message);
+    const messages = {
+      LIMIT_FILE_SIZE: [413, `Files can be at most ${MAX_UPLOAD_MB} MB`],
+      LIMIT_FILE_COUNT: [413, `At most ${MAX_FILES} files can be uploaded at once`],
+    };
+    const [status, message] = messages[err.code] ?? [400, err.message];
+    err = httpError(status, message);
   }
   const status = err.status || (err.type === 'entity.parse.failed' ? 400 : 422);
   res.status(status).json({ error: err.message || 'Unexpected error' });
