@@ -37,6 +37,7 @@ npm start     # open http://localhost:3000
 | `MAX_UPLOAD_MB`            | `2048`      | Largest file that can be uploaded                   |
 | `MAX_FILES`                | `100`       | Most files that can be uploaded at once             |
 | `GIF_MAX_SECONDS`          | `60`        | Longest clip Video → GIF accepts                    |
+| `MAX_PLAYLIST_ITEMS`       | `50`        | Most videos downloaded from one playlist            |
 | `YTDLP_PATH`, `FFMPEG_DIR` | `bin/`      | Use your own binaries                               |
 
 ---
@@ -58,7 +59,11 @@ for downloading and ffmpeg for merging and converting.
   contain VP9 video, which plays fine in browsers and VLC but may not open in older editors.
 - If a site answers `403 Forbidden`, the job retries, first unchanged and then with alternative clients.
   Retries are pinned to the format chosen by the first attempt, so a retry never silently downgrades quality.
-- Playlists are not supported yet.
+- Pasting a link shows what it is (title, length, thumbnail) before downloading.
+- **Playlists**: a playlist link downloads every video (up to `MAX_PLAYLIST_ITEMS`), numbered in playlist
+  order. For a video that belongs to a playlist, pick "this video" or "whole playlist". Each video can be
+  downloaded on its own, or all of them as a zip named after the playlist. Videos that cannot be downloaded
+  (private, removed…) are skipped and counted.
 
 **Maintenance:** sites change often and yt-dlp is updated to keep up. If downloads start failing:
 
@@ -204,7 +209,7 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
 
 - `POST /api/jobs` → creates a job and returns its state. Send JSON with a `url`, or multipart with one or more
   `file` fields, plus `tool` (`downloader` by default) and the tool's options:
-  - `downloader`: `mode`, `videoFormat`, `quality`, `audioFormat`, `audioBitrate`
+  - `downloader`: `mode`, `videoFormat`, `quality`, `audioFormat`, `audioBitrate`, `playlist` (`video`, `all`)
   - `gif`: `start`, `end`, `fps`, `width`, `format`
   - `video`: `start`, `end`, `format`, `codec`, `resolution`, `fps`, `audio`, `mode`, `quality`, `targetMb`
   - `audio`: `start`, `end`, `format`, `bitrate`, `channels`, `normalize`
@@ -214,7 +219,9 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
 - `GET /api/jobs/:id/file` → the finished file (a zip when a job produced several)
 - `GET /api/jobs/:id/outputs/:index` → one of the files of a job that produced several (listed in `outputs`)
 - `DELETE /api/jobs/:id` → cancels the job
-- `POST /api/info` `{ url }` → title, uploader, duration, thumbnail and available resolutions of a link
+- `POST /api/info` `{ url, playlist? }` → what a link is: `type: 'video'` (title, uploader, duration, thumbnail,
+  resolutions) or `type: 'playlist'` (title, uploader, video count). With `playlist: true`, a video link inside
+  a playlist describes the playlist.
 
 ### Adding a tool
 
@@ -266,7 +273,8 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Audio converter
 - [x] Image converter
 - [x] PDF: merge, images → PDF, extract pages
-- [ ] Downloader: playlists, cookies for age-restricted videos
+- [x] Downloader: playlists
+- [ ] Downloader: cookies for age-restricted videos
 
 ---
 
