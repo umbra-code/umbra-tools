@@ -149,6 +149,8 @@ body {
 /* --- Forms ------------------------------------------------------------------------- */
 
 form { display: flex; flex-direction: column; gap: 18px; }
+/* The shared file-or-link picker is one element in the form: space out what it contains too. */
+[data-media-source] { display: flex; flex-direction: column; gap: 14px; }
 
 input {
   flex: 1;
