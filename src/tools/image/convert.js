@@ -1,13 +1,9 @@
 // Converts one image with sharp.
 import fs from 'node:fs';
 import path from 'node:path';
-import sharp from 'sharp';
+import sharp from '../../core/sharp.js';
 import { safeFileName, stripExtension, uniquePath } from '../../core/files.js';
 import { ANIMATED_FORMATS, encoderFor, EXTENSIONS, resolveFormat } from './options.js';
-
-// libvips caches open input files, which on Windows keeps them locked and stops the job's
-// temp folder from being deleted. Each image is read once anyway, so the cache only gets in the way.
-sharp.cache({ files: 0 });
 
 /**
  * Converts the image at `input` (named `name`) into `outDir` with the parsed `options`.
