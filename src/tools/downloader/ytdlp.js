@@ -38,14 +38,26 @@ export const DEFAULTS = {
 /** Validates client options against the allowlist, falling back to defaults. */
 export const sanitizeOptions = (input = {}) => pickAllowed(input, OPTIONS, DEFAULTS);
 
+// Videos that only signed-in accounts can see. umbra tools never signs in (it would mean handing
+// it your account's cookies, and accounts tied to your Google identity can be flagged for
+// automated downloads), so these get a clear explanation instead of yt-dlp's raw error.
+const SIGN_IN_REQUIRED = [
+  [/confirm your age|age[- ]restricted|inappropriate for some users/i, 'This video is age-restricted'],
+  [/private video/i, 'This video is private'],
+  [/members[- ]only|join this channel/i, "This video is only for the channel's members"],
+];
+
 /** Extracts a readable message from yt-dlp's stderr. */
 export function cleanError(stderr) {
   const lines = stderr.split(/\r?\n/).filter(Boolean);
   const line = lines.reverse().find((l) => l.startsWith('ERROR:')) || lines[0] || 'Unknown error';
-  return line
+  const message = line
     .replace(/^ERROR:\s*/, '')
     .replace(/^\[[^\]]+\]\s*[\w-]+:\s*/, '')
     .slice(0, 300);
+
+  const [, reason] = SIGN_IN_REQUIRED.find(([pattern]) => pattern.test(message)) ?? [];
+  return reason ? `${reason}: it needs a signed-in account, and umbra tools does not sign in to accounts for your safety` : message;
 }
 
 /** The best thumbnail URL in yt-dlp's info (or its first entry's, for playlists). */

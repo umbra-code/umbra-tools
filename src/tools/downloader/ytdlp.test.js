@@ -148,6 +148,24 @@ describe('cleanError', () => {
   it('has a fallback for empty output', () => {
     expect(cleanError('')).toBe('Unknown error');
   });
+
+  it('explains videos that need a signed-in account', () => {
+    const cases = {
+      'ERROR: [youtube] abc: Sign in to confirm your age. This video may be inappropriate for some users.': /age-restricted/,
+      'ERROR: [youtube] abc: Private video. Sign in if you\'ve been granted access to this video': /private/,
+      'ERROR: [youtube] abc: Join this channel to get access to members-only content like this video': /members/,
+    };
+    for (const [stderr, reason] of Object.entries(cases)) {
+      const message = cleanError(stderr);
+      expect(message).toMatch(reason);
+      expect(message).toMatch(/does not sign in to accounts/);
+    }
+  });
+
+  it('leaves other sign-in messages alone', () => {
+    // The bot check is temporary and has nothing to do with the video itself.
+    expect(cleanError("ERROR: [youtube] abc: Sign in to confirm you're not a bot")).toBe("Sign in to confirm you're not a bot");
+  });
 });
 
 describe('isForbidden', () => {
