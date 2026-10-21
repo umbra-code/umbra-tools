@@ -350,6 +350,81 @@ video.audio-only { height: 54px; background: transparent; }
 .file-row-size { color: var(--muted); font-size: 0.8rem; padding-right: 4px; }
 .file-rows button:disabled { opacity: 0.3; cursor: default; }
 
+/* --- Metadata ---------------------------------------------------------------------------- */
+
+.meta-editor { display: flex; flex-direction: column; gap: 18px; }
+.meta-alert {
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  color: var(--warn);
+  font-size: 0.9rem;
+}
+.meta-block h2 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.meta-details {
+  list-style: none;
+  margin: 0;
+  padding: 4px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.meta-details li {
+  display: flex;
+  gap: 12px;
+  padding: 7px 0;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+.meta-details li:last-child { border-bottom: 0; }
+.meta-label { flex: 0 0 120px; color: var(--muted); }
+.meta-value { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.meta-details .sensitive .meta-label { color: var(--warn); }
+.meta-details .sensitive .meta-label::before { content: '⚠ '; }
+.meta-empty { color: var(--muted); }
+
+.meta-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.meta-field { display: flex; flex-direction: column; gap: 6px; }
+.meta-field.wide { grid-column: 1 / -1; }
+.meta-field input, .meta-field textarea, .meta-field select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s;
+}
+.meta-field input:focus, .meta-field textarea:focus { border-color: var(--accent); outline: none; }
+textarea {
+  min-width: 0;
+  color: var(--text);
+  font: inherit;
+  padding: 8px 10px;
+  resize: vertical;
+}
+.meta-fields > .hint { grid-column: 1 / -1; }
+
+/* A labelled option that is not a <label> (it contains its own file input). */
+.option { display: flex; flex-direction: column; gap: 7px; }
+.option-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.dropzone.compact { padding: 14px 12px; font-size: 0.9rem; }
+
 /* --- Inputs: times, sizes, pages, quality ------------------------------------------------ */
 
 .range {
@@ -624,6 +699,8 @@ video.audio-only { height: 54px; background: transparent; }
 }
 
 @media (max-width: 480px) {
+  .meta-fields { grid-template-columns: minmax(0, 1fr); }
+  .meta-label { flex-basis: 96px; }
   .preview .thumb { width: 96px; }
   .time-input { width: 100%; }
   .range label { flex: 1 1 140px; }

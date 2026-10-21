@@ -6,8 +6,9 @@ import * as video from './tools/video.js';
 import * as audio from './tools/audio.js';
 import * as image from './tools/image.js';
 import * as pdf from './tools/pdf.js';
+import * as metadata from './tools/metadata.js';
 
-const tools = { downloader, gif, video, audio, image, pdf };
+const tools = { downloader, gif, video, audio, image, pdf, metadata };
 const DEFAULT_TOOL = 'downloader';
 
 for (const [id, tool] of Object.entries(tools)) tool.init($(`#tool-${id}`));

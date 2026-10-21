@@ -17,6 +17,7 @@
     <symbol id="i-audio" viewBox="0 0 24 24"><path d="M4 10v4m4-8v12m4-15v18m4-13v8m4-5v2"/></symbol>
     <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17.5 5-4.5 4 3.5 2.5-2 4.5 3.5"/></symbol>
     <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M6.5 3.5h7l4 4v13h-11z"/><path d="M13.5 3.5v4h4M9 12.5h6M9 16h6"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 4.5v7.4a1 1 0 0 0 .3.7l8.6 8.6a1 1 0 0 0 1.4 0l6.9-6.9a1 1 0 0 0 0-1.4l-8.6-8.6a1 1 0 0 0-.7-.3H4.5a1 1 0 0 0-1 1z"/><circle cx="8.5" cy="8.5" r="1.5"/></symbol>
   </svg>
 
   <aside class="sidebar">
@@ -52,6 +53,10 @@
       <button type="button" role="tab" class="nav-item" data-tool="pdf">
         <svg aria-hidden="true"><use href="#i-pdf"/></svg>
         <span class="nav-label">PDF</span><span class="nav-short">PDF</span>
+      </button>
+      <button type="button" role="tab" class="nav-item" data-tool="metadata">
+        <svg aria-hidden="true"><use href="#i-tag"/></svg>
+        <span class="nav-label">Metadata</span><span class="nav-short">Meta</span>
       </button>
     </nav>
 
@@ -413,6 +418,60 @@
         </div>
 
         <button type="submit" class="go wide">create pdf</button>
+      </form>
+      <div class="result-slot"></div>
+    </section>
+
+    <!-- Metadata -->
+    <section id="tool-metadata" class="tool" role="tabpanel" hidden>
+      <header class="tool-head">
+        <h1>Metadata</h1>
+        <p>See what a file says about you, then edit it or clean it.</p>
+      </header>
+      <form autocomplete="off">
+        <label class="dropzone" data-dropzone>
+          <input name="file" type="file" accept="image/*,audio/*,video/*,application/pdf,.pdf" hidden>
+          <span data-file-label>drop an image, audio, video or PDF here, or click to choose one</span>
+        </label>
+        <p class="hint" data-inspect-hint hidden></p>
+
+        <div class="meta-editor" data-editor hidden>
+          <div class="meta-alert" data-alert hidden></div>
+
+          <div class="meta-block">
+            <h2>What else it says</h2>
+            <ul class="meta-details" data-details></ul>
+          </div>
+
+          <div class="meta-block">
+            <h2>Fields</h2>
+            <div class="meta-fields" data-fields></div>
+          </div>
+
+          <div class="options">
+            <label>everything else
+              <div class="group" data-key="clean">
+                <button type="button" data-value="on" title="Only the fields above are kept">remove</button>
+                <button type="button" data-value="off">keep</button>
+              </div>
+              <span class="hint" data-clean-hint></span>
+            </label>
+            <div class="option" data-cover-option hidden>
+              <span class="option-label">cover</span>
+              <div class="group" data-key="cover">
+                <button type="button" data-value="keep">keep</button>
+                <button type="button" data-value="remove">remove</button>
+                <button type="button" data-value="replace">new image</button>
+              </div>
+              <label class="dropzone compact" data-cover-drop data-show-when="cover=replace">
+                <input name="cover" type="file" accept="image/*" hidden>
+                <span data-cover-label>choose the cover image</span>
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" class="go wide">save file</button>
+        </div>
       </form>
       <div class="result-slot"></div>
     </section>
