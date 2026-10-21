@@ -14,6 +14,7 @@ Everything runs on your machine, so files never leave it and there are no upload
 | [Audio converter](#audio-converter) | ✅ available | Convert, trim, downmix and normalize audio, or extract it from a video |
 | [Image converter](#image-converter) | ✅ available | Convert, resize and compress many images at once |
 | [PDF](#pdf) | ✅ available | Merge PDFs, turn images into a PDF, extract pages |
+| [Metadata](#metadata) | ✅ available | See what a file says about you (like its location), edit it or clean it |
 
 Ideas and order are not set in stone; see [Roadmap](#roadmap).
 
@@ -171,6 +172,33 @@ Simple PDF tasks, built on [pdf-lib](https://pdf-lib.js.org/). Everything happen
 
 ---
 
+## Metadata
+
+Drop an image, audio, video or PDF to see what it says about itself, then edit it or clean it.
+
+- **Read**: the editable fields, plus the details a file carries without you noticing, with the
+  sensitive ones flagged: the **location** where a photo or video was taken, the camera or phone, its serial
+  number. Also the software, the recording date, editing history and other tags.
+- **Edit** the usual fields:
+
+  | Kind  | Fields                                                     |
+  |-------|------------------------------------------------------------|
+  | image | title, author, copyright, date taken                       |
+  | audio | title, artist, album, date, genre, comment, copyright      |
+  | video | title, artist, date, comment, copyright                    |
+  | PDF   | title, author, subject, keywords                           |
+
+- **Clean**: "everything else → remove" keeps only those fields and drops the rest.
+- **Cover**: keep, remove or replace the cover image of mp3, m4a and flac files.
+- Audio and video are rewritten **without re-encoding**. PDFs lose their old details for real (they are deleted
+  from the file, not just unlinked). Images are re-encoded in their own format (PNG losslessly) and their
+  fields are written as both EXIF and XMP, so accents survive.
+- On purpose, the location can only be seen and removed, never written: making one up is the easiest way to use
+  this tool to deceive. Editing metadata is legal; using it to pass off someone else's work as yours or to fake
+  evidence is not, and is on whoever does it.
+
+---
+
 ## Architecture
 
 The app is a small Express server plus a dependency-free frontend. Long-running work runs as
@@ -196,6 +224,7 @@ src/tools/               one folder per tool
   audio/                 audio converter
   image/                 image converter (sharp)
   pdf/                   PDF tools (pdf-lib)
+  metadata/              metadata reader and editor (exif-reader, sharp, ffmpeg, pdf-lib)
 public/                  UI (plain HTML/CSS/JS modules)
   js/main.js             tool menu
   js/media-source.js     file-or-link picker with player and trimmer, shared by the media tools
@@ -218,10 +247,13 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
   - `audio`: `start`, `end`, `format`, `bitrate`, `channels`, `normalize`
   - `image`: `format`, `quality`, `maxSize`, `metadata` (several files)
   - `pdf`: `mode` (`merge`, `images`, `extract`), `pageSize`, `pages` (several files)
+  - `metadata`: `fields` (JSON object), `clean` (`on`, `off`), `cover` (`keep`, `remove`, `replace` with a `cover` file)
 - `GET /api/jobs/:id` → `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage` and `progress`
 - `GET /api/jobs/:id/file` → the finished file (a zip when a job produced several)
 - `GET /api/jobs/:id/outputs/:index` → one of the files of a job that produced several (listed in `outputs`)
 - `DELETE /api/jobs/:id` → cancels the job
+- `POST /api/tools/:tool/inspect` (multipart `file`) → what a file says about itself, for tools that can read
+  files without starting a job (`metadata`); the upload is deleted right after
 - `POST /api/info` `{ url, playlist? }` → what a link is: `type: 'video'` (title, uploader, duration, thumbnail,
   resolutions) or `type: 'playlist'` (title, uploader, video count). With `playlist: true`, a video link inside
   a playlist describes the playlist.
@@ -230,6 +262,8 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
 
 1. Create `src/tools/<tool>/index.js` exporting `{ id, accepts, parseOptions(body), run(ctx) }`:
    - `accepts`: what it takes: `'url'`, `'file'` (exactly one, `ctx.file`) and/or `'files'` (one or more, `ctx.files`).
+   - `attachments: ['cover']` for named extra files sent next to the main one (`ctx.attachments.cover`).
+   - `inspect(file)` to read a file without a job (`POST /api/tools/:tool/inspect`).
    - `multipleOutputs: true` when it can produce several files: each one is offered on its own and all of them
      as a zip (named after `ctx.archiveName`). Otherwise the largest file in `ctx.outDir` is the result.
    - `parseOptions` validates the request (use `pickAllowed` for allowlists; throw `httpError(400, …)`).
@@ -276,6 +310,7 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Audio converter
 - [x] Image converter
 - [x] PDF: merge, images → PDF, extract pages
+- [x] Metadata: read, edit and clean
 - [x] Downloader: playlists
 - ~~Downloader: cookies for age-restricted videos~~ (left out on purpose, see [Media downloader](#media-downloader))
 
