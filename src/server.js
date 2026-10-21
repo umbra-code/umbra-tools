@@ -40,23 +40,48 @@ app.post('/api/info', async (req, res) => {
   res.json(await getInfo(parseUrl(req.body?.url), { playlist: req.body?.playlist === true }));
 });
 
-// JSON with a `url`, or multipart with one or more `file` fields. Without `tool` it is the
-// downloader, as in v1.0.
-app.post('/api/jobs', upload.array('file', MAX_FILES), (req, res) => {
-  const files = req.files ?? [];
+const removeUploads = (files) => {
+  for (const file of files) fs.rm(file.path, { force: true }, () => {});
+};
+
+// JSON with a `url`, or multipart with one or more `file` fields (plus a `cover` for tools
+// that take one). Without `tool` it is the downloader, as in v1.0.
+app.post('/api/jobs', upload.fields([{ name: 'file', maxCount: MAX_FILES }, { name: 'cover', maxCount: 1 }]), (req, res) => {
+  const files = req.files?.file ?? [];
+  const cover = req.files?.cover?.[0];
+  const uploads = [...files, ...(cover ? [cover] : [])];
   try {
     const tool = tools[req.body?.tool || 'downloader'];
     if (!tool) throw httpError(400, 'Unknown tool');
-    for (const file of files) file.originalname = decodeFileName(file.originalname);
+    for (const file of uploads) file.originalname = decodeFileName(file.originalname);
+    if (cover && !tool.attachments?.includes('cover')) throw httpError(400, 'This tool does not take a cover');
 
     const job = createJob(tool, {
       ...parseSource(req.body, files, tool.accepts),
+      ...(cover ? { attachments: { cover: { path: cover.path, name: cover.originalname } } } : {}),
       options: tool.parseOptions(req.body ?? {}),
     });
     res.status(201).json(publicJob(job));
   } catch (err) {
-    for (const file of files) fs.rm(file.path, { force: true }, () => {});
+    removeUploads(uploads);
     throw err;
+  }
+});
+
+// Reads what a file says about itself, for tools that can (`inspect`), without starting a job.
+app.post('/api/tools/:tool/inspect', upload.single('file'), async (req, res) => {
+  try {
+    const tool = tools[req.params.tool];
+    if (!tool?.inspect) throw httpError(404, 'This tool cannot inspect files');
+    if (!req.file) throw httpError(400, 'Choose a file to upload');
+    const name = decodeFileName(req.file.originalname);
+    try {
+      res.json(await tool.inspect({ path: req.file.path, name }));
+    } catch (err) {
+      throw httpError(422, err.message);
+    }
+  } finally {
+    if (req.file) removeUploads([req.file]);
   }
 });
 

@@ -36,7 +36,7 @@ export function getJob(id) {
 
 /**
  * `input` is `{ url }`, `{ file }` or `{ files }` (files as `{ path, name }`), plus the tool's
- * parsed `options`.
+ * parsed `options` and, optionally, named extra files in `attachments` (e.g. `{ cover }`).
  */
 export function createJob(tool, input) {
   if (jobs.size >= MAX_JOBS) throw httpError(429, 'The server is busy, try again in a few minutes');
@@ -51,6 +51,12 @@ export function createJob(tool, input) {
   };
   if (input.file) input = { ...input, file: moveIn(input.file) };
   if (input.files) input = { ...input, files: input.files.map(moveIn) };
+  if (input.attachments) {
+    input = {
+      ...input,
+      attachments: Object.fromEntries(Object.entries(input.attachments).map(([name, file]) => [name, moveIn(file)])),
+    };
+  }
 
   const job = {
     id: randomUUID(),
@@ -168,6 +174,7 @@ function createContext(job) {
     url: job.input.url,
     file: job.input.file,
     files: job.input.files,
+    attachments: job.input.attachments ?? {},
     options: job.input.options,
     workDir: path.join(job.dir, 'work'),
     outDir: path.join(job.dir, 'out'),
