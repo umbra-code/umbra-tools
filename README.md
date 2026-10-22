@@ -40,6 +40,7 @@ npm start     # open http://localhost:3000
 | `GIF_MAX_SECONDS`          | `60`        | Longest clip Video → GIF accepts                    |
 | `MAX_PLAYLIST_ITEMS`       | `50`        | Most videos downloaded from one playlist            |
 | `YTDLP_PATH`, `FFMPEG_DIR` | `bin/`      | Use your own binaries                               |
+| `YTDLP_AUTO_UPDATE`        | on          | `0` stops yt-dlp from updating itself on startup    |
 
 ---
 
@@ -69,7 +70,10 @@ for downloading and ffmpeg for merging and converting.
   error says so. On purpose: it would need your account's cookies, and YouTube can flag accounts used for
   automated downloads (accounts are tied to your Google identity, so a secondary one does not fully protect you).
 
-**Maintenance:** sites change often and yt-dlp is updated to keep up. If downloads start failing:
+**Maintenance:** sites change often and yt-dlp is updated to keep up, so it **updates itself**: on startup, if
+the last check was more than a week ago, a newer yt-dlp is fetched in the background (downloads wait for it to
+finish). Without internet it just keeps the current one. To update right away, for example when downloads
+suddenly start failing:
 
 ```sh
 npm run update-ytdlp
@@ -282,6 +286,9 @@ npm test             # Vitest (npm run test:watch to keep it running)
 
 CI (GitHub Actions) runs lint and tests on every push to `main` and `development` and on pull requests.
 It sets `UMBRA_SKIP_SETUP=1` so `npm ci` does not download yt-dlp and ffmpeg.
+
+Dependabot opens one grouped pull request a month against `development` with the npm and GitHub Actions
+updates (`chore(deps): …`), so CI checks them before they reach a release.
 
 ### Branches and commits
 
