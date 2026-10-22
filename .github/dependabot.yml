@@ -1,0 +1,28 @@
+# Dependency updates: one grouped pull request a month, against development, so CI checks it
+# before it reaches a release. Security fixes are separate (enable "Dependabot security updates"
+# in the repository settings) and arrive as soon as they are published.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    target-branch: development
+    schedule:
+      interval: monthly
+    groups:
+      dependencies:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: development
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore
+      include: scope
