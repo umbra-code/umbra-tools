@@ -3,6 +3,7 @@
 import { BINARIES } from '../../core/paths.js';
 import { pickAllowed } from '../../core/input.js';
 import { killTree, runProcess } from '../../core/process.js';
+import { ytdlpUpdated } from './update.js';
 
 export const MAX_PLAYLIST_ITEMS = Number(process.env.MAX_PLAYLIST_ITEMS) || 50;
 
@@ -70,6 +71,7 @@ const thumbnailOf = (info) =>
  * video inside a playlist describes the playlist instead of the video.
  */
 export async function getInfo(url, { playlist = false, timeoutMs = 60_000 } = {}) {
+  await ytdlpUpdated();
   let child;
   let timedOut = false;
   const lines = [];
@@ -229,6 +231,7 @@ const POSTPROCESSORS = /^\[(Merger|ExtractAudio|VideoRemuxer|VideoConvertor|Embe
  * and retrying on 403 (see RETRY_STRATEGIES).
  */
 export async function download(ctx, url, { dir, format = [], extra = [] }) {
+  await ytdlpUpdated();
   let pinned = null;
 
   for (let attempt = 0; ; attempt++) {
@@ -304,6 +307,7 @@ export function buildPlaylistArgs(url, dir, { format = [], maxItems = MAX_PLAYLI
  * it does not throw when some videos fail, so the caller decides from what was downloaded.
  */
 export async function downloadPlaylist(ctx, url, { dir, format = [] }) {
+  await ytdlpUpdated();
   const state = { title: null, item: 0, items: null, part: 0, parts: 1 };
   ctx.set({ attempt: 0, item: 0, items: null, part: 0, parts: 1 });
   ctx.stage('downloading', 0);

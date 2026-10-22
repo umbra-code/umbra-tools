@@ -8,6 +8,7 @@ import { parseSource, parseUrl } from './core/input.js';
 import { cancelJob, createJob, getJob, initTempDir, jobOutput, publicJob, shutdown } from './core/jobs.js';
 import { tools } from './tools/index.js';
 import { getInfo } from './tools/downloader/ytdlp.js';
+import { autoUpdateYtdlp } from './tools/downloader/update.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -122,6 +123,7 @@ app.use((err, req, res, _next) => {
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`umbra-tools listening on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+  autoUpdateYtdlp();
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
