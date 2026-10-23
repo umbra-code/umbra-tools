@@ -388,11 +388,31 @@
               <button type="button" data-value="avif" title="Smallest; slower, and older apps can't open it">avif</button>
             </div>
           </label>
-          <label data-show-when="format!=png">quality
-            <span class="slider">
-              <input name="quality" type="range" min="1" max="100" step="1" aria-label="Quality">
-              <span class="slider-value" data-quality-value></span>
+          <label>quality
+            <div class="group" data-key="qualityMode">
+              <button type="button" data-value="manual">set it</button>
+              <button type="button" data-value="size" title="The best quality that stays under a weight">fit a size</button>
+            </div>
+            <span data-show-when="qualityMode=manual">
+              <span class="slider" data-show-when="format!=png">
+                <input name="quality" type="range" min="1" max="100" step="1" aria-label="Quality">
+                <span class="slider-value" data-quality-value></span>
+              </span>
             </span>
+            <span class="size-row" data-show-when="qualityMode=size">
+              <span class="time-input size-input">
+                <input name="maxKb" type="number" min="1" max="102400" step="any" aria-label="Maximum weight in KB">
+                <span class="unit">KB</span>
+              </span>
+              <span class="group">
+                <button type="button" data-kb="100">100</button>
+                <button type="button" data-kb="250">250</button>
+                <button type="button" data-kb="500">500</button>
+                <button type="button" data-kb="1000">1000</button>
+                <button type="button" data-kb="2000">2000</button>
+              </span>
+            </span>
+            <span class="hint" data-show-when="qualityMode=size">at most this weight, at the best quality that fits; if not even the lowest does, the picture gets smaller</span>
           </label>
           <label data-single>size
             <span class="size-row">

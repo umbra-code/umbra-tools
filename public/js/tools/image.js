@@ -11,6 +11,8 @@ const DEFAULTS = {
   maxSize: 'original',
   metadata: 'remove',
   quality: '80',
+  qualityMode: 'manual',
+  maxKb: '500',
   aspect: 'free',
 };
 const RATIOS = { free: null, original: 'image', '1:1': 1, '4:5': 4 / 5, '16:9': 16 / 9, '9:16': 9 / 16, '3:2': 3 / 2 };
@@ -62,6 +64,32 @@ export function init(section) {
     saveSettings('image', state);
     schedulePreview();
   });
+
+  // "fit a size": the server finds the best quality that stays under this weight.
+  form.maxKb.value = state.maxKb;
+  form.maxKb.addEventListener('input', () => {
+    if (!(Number(form.maxKb.value) > 0)) return;
+    state.maxKb = form.maxKb.value;
+    saveSettings('image', state);
+    schedulePreview();
+  });
+  for (const btn of $$('[data-kb]', form)) {
+    btn.addEventListener('click', () => {
+      form.maxKb.value = btn.dataset.kb;
+      form.maxKb.dispatchEvent(new Event('input'));
+    });
+  }
+
+  const automatic = () => state.qualityMode === 'size';
+  /** The quality fields for the server: a fixed quality, or 'auto' with the maximum weight. */
+  const qualityFields = () => (automatic() ? { quality: 'auto', maxKb: state.maxKb } : { quality: state.quality });
+
+  /** "quality 63 (auto) · resized to 72% to fit", from what the server chose. */
+  const describeChoice = ({ quality, scale }) =>
+    [
+      quality != null && automatic() ? `quality ${quality} (auto)` : '',
+      scale != null && scale < 1 ? `resized to ${Math.round(scale * 100)}% to fit` : '',
+    ].filter(Boolean);
 
   // --- Mode: one image (editor) or several (batch) -----------------------------------------
 
@@ -210,7 +238,7 @@ export function init(section) {
     const file = files[0];
     previewAbort?.abort();
     const abort = (previewAbort = new AbortController());
-    const options = { format: state.format, quality: state.quality, metadata: state.metadata, ...editor.edits() };
+    const options = { format: state.format, ...qualityFields(), metadata: state.metadata, ...editor.edits() };
     // The original, framed as this request (cropped, rotated, flipped), for the comparison.
     const frame = editor.frame();
 
@@ -225,7 +253,7 @@ export function init(section) {
     };
 
     try {
-      setLive('rendering…');
+      setLive(automatic() ? 'finding the best quality… (big photos take a few seconds)' : 'rendering…');
       let res = await request(false);
       // The server forgets uploads after a while: send it again once.
       if (res.status === 404) res = await request(true);
@@ -243,7 +271,12 @@ export function init(section) {
       download.href = resultUrl;
       download.download = meta.name;
       setLive(
-        `${meta.format} · ${meta.width} × ${meta.height} · ${formatBytes(meta.size)} (${sizeChange(file.size, meta.size)})`,
+        [
+          meta.format,
+          `${meta.width} × ${meta.height}`,
+          `${formatBytes(meta.size)} (${sizeChange(file.size, meta.size)})`,
+          ...describeChoice(meta),
+        ].join(' · '),
         meta.size > file.size ? 'warn' : 'ok',
       );
     } catch (err) {
@@ -292,6 +325,7 @@ export function init(section) {
         detail: [
           `${item.width}×${item.height}`,
           before ? `${formatBytes(before)} → ${formatBytes(item.size)} (${sizeChange(before, item.size)})` : formatBytes(item.size),
+          ...describeChoice(item),
         ].join(' · '),
       };
     });
@@ -320,9 +354,9 @@ export function init(section) {
     if (result.busy || files.length < 2) return;
 
     const sent = [...files];
-    const { format, maxSize, metadata, quality } = state;
+    const { format, maxSize, metadata } = state;
     const data = new FormData();
-    for (const [key, value] of Object.entries({ tool: 'image', format, maxSize, metadata, quality })) data.append(key, value);
+    for (const [key, value] of Object.entries({ tool: 'image', format, maxSize, metadata, ...qualityFields() })) data.append(key, value);
     for (const file of sent) data.append('file', file);
 
     const go = $('.go', form);
