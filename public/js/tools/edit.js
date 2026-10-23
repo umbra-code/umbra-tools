@@ -162,8 +162,12 @@ export function init(section) {
     });
   }
 
+  // Only a new aspect ratio moves the crop box; other options (like the format) leave it alone.
+  let aspect = state.aspect;
   bindOptions(form, state, () => {
     saveSettings('edit', state);
+    if (state.aspect === aspect) return;
+    aspect = state.aspect;
     if (bitmap) resetCrop();
   });
 
