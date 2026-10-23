@@ -1,8 +1,11 @@
-// Image converter: convert, resize and compress one or many images at once.
+// Images: convert, resize and compress many images at once, or edit one (crop, rotate, flip)
+// with a live preview of the exact result.
 import fs from 'node:fs';
 import path from 'node:path';
-import { convertImage, describeImageError } from './convert.js';
-import { parseOptions } from './options.js';
+import { httpError } from '../../core/errors.js';
+import { stripExtension } from '../../core/files.js';
+import { convertImage, describeImageError, renderImage } from './convert.js';
+import { EXTENSIONS, hasEdits, MIME_TYPES, parseOptions } from './options.js';
 
 export default {
   id: 'image',
@@ -10,7 +13,26 @@ export default {
   multipleOutputs: true,
   parseOptions,
 
+  /** The exact result for one kept upload, in memory, with its format, size and weight. */
+  async preview(upload, options) {
+    let result;
+    try {
+      result = await renderImage(upload.path, options);
+    } catch (err) {
+      throw httpError(422, describeImageError(err, upload.name));
+    }
+    const { data, format, width, height } = result;
+    return {
+      data,
+      contentType: MIME_TYPES[format],
+      meta: { format, width, height, size: data.length, name: `${stripExtension(upload.name)}.${EXTENSIONS[format]}` },
+    };
+  },
+
   async run(ctx) {
+    // Edits are drawn on one picture; applied to a batch, the crop would land somewhere else on each.
+    if (ctx.files.length > 1 && hasEdits(ctx.options)) throw new Error('Cropping, rotating and flipping work on one image at a time');
+
     ctx.archiveName = 'images';
     ctx.stage('converting', 0);
 

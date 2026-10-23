@@ -6,6 +6,7 @@ import { ROOT, UPLOAD_DIR } from './core/paths.js';
 import { httpError } from './core/errors.js';
 import { parseSource, parseUrl } from './core/input.js';
 import { cancelJob, createJob, getJob, initTempDir, jobOutput, publicJob, shutdown } from './core/jobs.js';
+import { getUpload, keepUpload, removeUpload } from './core/uploads.js';
 import { tools } from './tools/index.js';
 import { getInfo } from './tools/downloader/ytdlp.js';
 import { autoUpdateYtdlp } from './tools/downloader/update.js';
@@ -67,6 +68,31 @@ app.post('/api/jobs', upload.fields([{ name: 'file', maxCount: MAX_FILES }, { na
     removeUploads(uploads);
     throw err;
   }
+});
+
+// Uploads kept for a while, so a tool can preview the same file many times without the
+// browser sending it again (see src/core/uploads.js).
+app.post('/api/uploads', upload.single('file'), (req, res) => {
+  if (!req.file) throw httpError(400, 'Choose a file to upload');
+  res.status(201).json(keepUpload(req.file, decodeFileName(req.file.originalname)));
+});
+
+app.delete('/api/uploads/:id', (req, res) => {
+  removeUpload(req.params.id);
+  res.status(204).end();
+});
+
+// The exact result for a kept upload, without a job, for tools that can (`preview`).
+// The body is the result; X-Result says what it is (e.g. its format and size) as URI-encoded
+// JSON, since headers only take latin1 and file names can have any character.
+app.post('/api/tools/:tool/preview', async (req, res) => {
+  const tool = tools[req.params.tool];
+  if (!tool?.preview) throw httpError(404, 'This tool has no preview');
+  const kept = getUpload(req.body?.upload);
+  if (!kept) throw httpError(404, 'The file is no longer on the server; choose it again');
+
+  const { data, contentType, meta } = await tool.preview(kept, tool.parseOptions(req.body ?? {}));
+  res.set({ 'Content-Type': contentType, 'Cache-Control': 'no-store', 'X-Result': encodeURIComponent(JSON.stringify(meta)) }).send(data);
 });
 
 // Reads what a file says about itself, for tools that can (`inspect`), without starting a job.
