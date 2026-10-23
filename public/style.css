@@ -425,6 +425,50 @@ textarea {
 }
 .dropzone.compact { padding: 14px 12px; font-size: 0.9rem; }
 
+/* --- Edit image -------------------------------------------------------------------------- */
+
+.editor { display: flex; flex-direction: column; gap: 16px; }
+.crop-stage {
+  position: relative;
+  align-self: center;
+  max-width: 100%;
+  line-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  /* checkerboard, so transparent areas are visible */
+  background: repeating-conic-gradient(var(--surface-2) 0% 25%, var(--surface) 0% 50%) 0 0 / 16px 16px;
+  touch-action: none;
+  user-select: none;
+}
+.crop-stage canvas { display: block; max-width: 100%; max-height: 62vh; }
+.crop-box {
+  position: absolute;
+  cursor: move;
+  outline: 1.5px solid rgb(255 255 255 / 0.9);
+  /* everything outside the crop is darkened */
+  box-shadow: 0 0 0 9999px rgb(8 7 13 / 0.62);
+  /* rule-of-thirds guides */
+  background:
+    linear-gradient(to right, transparent 33.2%, rgb(255 255 255 / 0.35) 33.2% 33.5%, transparent 33.5% 66.5%, rgb(255 255 255 / 0.35) 66.5% 66.8%, transparent 66.8%),
+    linear-gradient(to bottom, transparent 33.2%, rgb(255 255 255 / 0.35) 33.2% 33.5%, transparent 33.5% 66.5%, rgb(255 255 255 / 0.35) 66.5% 66.8%, transparent 66.8%);
+}
+/* L-shaped corners, inside the box so the image edge never cuts them off */
+.crop-handle {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 0 solid var(--accent);
+  filter: drop-shadow(0 0 3px rgb(0 0 0 / 0.6));
+}
+.crop-handle.nw { left: -2px; top: -2px; border-width: 4px 0 0 4px; cursor: nwse-resize; }
+.crop-handle.ne { right: -2px; top: -2px; border-width: 4px 4px 0 0; cursor: nesw-resize; }
+.crop-handle.sw { left: -2px; bottom: -2px; border-width: 0 0 4px 4px; cursor: nesw-resize; }
+.crop-handle.se { right: -2px; bottom: -2px; border-width: 0 4px 4px 0; cursor: nwse-resize; }
+.times { color: var(--muted); }
+/* Width × height stay on one line, also on phones (where other fields go full width). */
+.size-row .size-input { width: 120px; }
+.editor > .hint { text-align: center; padding-bottom: 0; }
+
 /* --- Inputs: times, sizes, pages, quality ------------------------------------------------ */
 
 .range {
