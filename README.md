@@ -12,7 +12,7 @@ Everything runs on your machine, so files never leave it and there are no upload
 | [Video → GIF](#video--gif) | ✅ available | Turn a time range of a video file or link into a GIF or animated WebP |
 | [Video converter](#video-converter) | ✅ available | Trim, resize, change format/codec and compress, also to a target file size |
 | [Audio converter](#audio-converter) | ✅ available | Convert, trim, downmix and normalize audio, or extract it from a video |
-| [Image converter](#image-converter) | ✅ available | Convert, resize and compress many images at once |
+| [Images](#images) | ✅ available | Crop, rotate, resize and convert an image with a live result, or many at once; fit them to a file size |
 | [PDF](#pdf) | ✅ available | Merge PDFs, turn images into a PDF, extract pages |
 | [Metadata](#metadata) | ✅ available | See what a file says about you (like its location), edit it or clean it |
 
@@ -37,6 +37,8 @@ npm start     # open http://localhost:3000
 | `FILE_TTL_MINUTES`         | `15`        | How long finished files are kept                    |
 | `MAX_UPLOAD_MB`            | `2048`      | Largest file that can be uploaded                   |
 | `MAX_FILES`                | `100`       | Most files that can be uploaded at once             |
+| `UPLOAD_TTL_MINUTES`       | `30`        | How long an image being edited is kept without use  |
+| `MAX_KEPT_UPLOADS`         | `50`        | Most images kept for editing at once (oldest go first) |
 | `GIF_MAX_SECONDS`          | `60`        | Longest clip Video → GIF accepts                    |
 | `MAX_PLAYLIST_ITEMS`       | `50`        | Most videos downloaded from one playlist            |
 | `YTDLP_PATH`, `FFMPEG_DIR` | `bin/`      | Use your own binaries                               |
@@ -141,21 +143,40 @@ Pick an audio or video file, or a link, optionally trim it, and convert its audi
 
 ---
 
-## Image converter
+## Images
 
-Drop one or many images (up to 100 at once) and convert them together. Built on [sharp](https://sharp.pixelplumbing.com/).
+Edit one image with a live result, or convert many at once (up to 100). Built on [sharp](https://sharp.pixelplumbing.com/).
+
+**One image** opens the editor:
+
+- Crop with a box (free or a fixed aspect such as 1:1, 4:3 or 16:9), rotate, flip and set the exact size
+  in pixels or as a percentage.
+- The result is rendered by the server as you change things, so what you see is exactly what you get,
+  with its real file size. Copy it to the clipboard or download it.
+- Zoom in (fit, 100%, 200%, Ctrl + wheel, drag to move around) and compare it with the original
+  using a slider.
+
+**Several images** are converted together; each one is listed with its size before and after, and they
+can be downloaded one by one or all together as a zip. Cropping, rotating and flipping work on one image
+at a time.
 
 | Option   | Values                              | Notes                                                        |
 |----------|-------------------------------------|--------------------------------------------------------------|
 | format   | same, jpg, png, webp, avif          | "same" keeps each image's format; png is lossless            |
-| quality  | 1–100                               | For jpg, webp and avif                                       |
-| max size | original, 3840 … 400 px             | Longest side; the aspect ratio is kept and nothing is enlarged |
+| quality  | set it (1–100), fit a size          | For jpg, webp and avif; see below                            |
+| size     | pixels / % (one image), max side (several) | The aspect ratio is kept; several images are never enlarged |
 | metadata | remove, keep                        | Removing drops EXIF data such as the camera and GPS location |
+
+**Fit a size** picks the quality for you: give the largest file size you want (in KB) and you get the
+best quality that stays under it. It estimates on a small copy, checks the estimate against the real
+picture and then tries a few qualities around it. PNG has no quality setting, so it is reduced to a
+256-color palette instead. If even the lowest quality does not fit, the image is scaled down until it
+does, and the result says so. On a 12 MP photo this takes about 5 s for jpg and 10–15 s for webp, avif
+and png.
 
 - Phone photos stored sideways are turned upright using their EXIF orientation.
 - Transparent areas become white when converting to jpg, which has no transparency.
-- Animated GIFs stay animated as webp; other formats keep the first frame.
-- Each image is listed with its size before and after; download them one by one or all together as a zip.
+- Animated GIFs stay animated as webp (unless edited); other formats keep the first frame.
 - A file that cannot be read does not stop the others. HEIC photos (iPhone) are not supported yet.
 
 ---
@@ -213,6 +234,7 @@ the result when it is done. Every tool is a job runner on top of the same core.
 src/server.js            HTTP API (Express) + static files
 src/core/                shared by every tool
   jobs.js                job queue, progress, cancellation, temp file cleanup
+  uploads.js             uploads kept for a while, so live previews do not send the file again
   input.js               option allowlists, links and uploaded files
   process.js             child processes (line-by-line output, killing process trees)
   media.js               ffprobe and ffmpeg helpers (what a file contains, progress, errors)
@@ -226,13 +248,15 @@ src/tools/               one folder per tool
   gif/                   video → GIF
   video/                 video converter
   audio/                 audio converter
-  image/                 image converter (sharp)
+  image/                 image editor and converter, fit a size (sharp)
   pdf/                   PDF tools (pdf-lib)
   metadata/              metadata reader and editor (exif-reader, sharp, ffmpeg, pdf-lib)
 public/                  UI (plain HTML/CSS/JS modules)
   js/main.js             tool menu
   js/media-source.js     file-or-link picker with player and trimmer, shared by the media tools
   js/trimmer.js          the trimmer, with filmstrip (video) and waveform (audio)
+  js/crop.js             crop box geometry
+  js/viewer.js           zoom and before/after comparison of a result
   js/tools/<tool>.js     one module per tool
 scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
 ```
@@ -249,7 +273,8 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
   - `gif`: `start`, `end`, `fps`, `width`, `format`
   - `video`: `start`, `end`, `format`, `codec`, `resolution`, `fps`, `audio`, `mode`, `quality`, `targetMb`
   - `audio`: `start`, `end`, `format`, `bitrate`, `channels`, `normalize`
-  - `image`: `format`, `quality`, `maxSize`, `metadata` (several files)
+  - `image`: `format`, `quality` (1–100 or `auto` with `maxKb`), `maxSize`, `metadata` (one or more files);
+    for one file also `rotate`, `flipH`, `flipV`, `cropX`, `cropY`, `cropWidth`, `cropHeight`, `width`, `height`
   - `pdf`: `mode` (`merge`, `images`, `extract`), `pageSize`, `pages` (several files)
   - `metadata`: `fields` (JSON object), `clean` (`on`, `off`), `cover` (`keep`, `remove`, `replace` with a `cover` file)
 - `GET /api/jobs/:id` → `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage` and `progress`
@@ -258,6 +283,10 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
 - `DELETE /api/jobs/:id` → cancels the job
 - `POST /api/tools/:tool/inspect` (multipart `file`) → what a file says about itself, for tools that can read
   files without starting a job (`metadata`); the upload is deleted right after
+- `POST /api/uploads` (multipart `file`) → `{ id }` of an upload kept for previews; `DELETE /api/uploads/:id` lets it go
+- `POST /api/tools/:tool/preview` (JSON `{ upload, ...options }`) → the rendered result right away, without a job,
+  for tools that support it (`image`). Its details (size, quality, scale…) come in the `X-Result` header as
+  URI-encoded JSON. Closing the request stops the work.
 - `POST /api/info` `{ url, playlist? }` → what a link is: `type: 'video'` (title, uploader, duration, thumbnail,
   resolutions) or `type: 'playlist'` (title, uploader, video count). With `playlist: true`, a video link inside
   a playlist describes the playlist.
@@ -268,6 +297,8 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
    - `accepts`: what it takes: `'url'`, `'file'` (exactly one, `ctx.file`) and/or `'files'` (one or more, `ctx.files`).
    - `attachments: ['cover']` for named extra files sent next to the main one (`ctx.attachments.cover`).
    - `inspect(file)` to read a file without a job (`POST /api/tools/:tool/inspect`).
+   - `preview(upload, options, { signal })` to render a kept upload right away (`POST /api/tools/:tool/preview`);
+     it returns `{ data, contentType, meta }` and should stop when `signal` aborts.
    - `multipleOutputs: true` when it can produce several files: each one is offered on its own and all of them
      as a zip (named after `ctx.archiveName`). Otherwise the largest file in `ctx.outDir` is the result.
    - `parseOptions` validates the request (use `pickAllowed` for allowlists; throw `httpError(400, …)`).
@@ -316,6 +347,9 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Video converter (trim, compress, change codec/resolution)
 - [x] Audio converter
 - [x] Image converter
+- [x] Images: editor (crop, rotate, flip, size) with a live result, zoom and compare
+- [x] Images: fit a file size (automatic quality)
+- [ ] GIF / video extras: speed, reverse, GIF → MP4
 - [x] PDF: merge, images → PDF, extract pages
 - [x] Metadata: read, edit and clean
 - [x] Downloader: playlists
