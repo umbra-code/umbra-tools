@@ -476,17 +476,75 @@ textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
-.live-image {
-  display: flex;
-  justify-content: center;
-  border-radius: var(--radius-sm);
+/* Viewer: the result, zoomable, with the original behind it for comparing. */
+.viewer {
+  position: relative;
+  min-height: 120px;
+  max-height: min(60vh, 760px);
   overflow: hidden;
+  border-radius: var(--radius-sm);
   background: repeating-conic-gradient(var(--surface-2) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+  touch-action: none;
+  user-select: none;
 }
-.live-image img { display: block; max-width: 100%; max-height: 50vh; transition: opacity 0.2s; }
+.viewer.zoomed { overflow: auto; cursor: grab; }
+.viewer.dragging { cursor: grabbing; }
+/* Centered while it fits; once zoomed in it starts at the edge so every part can be scrolled to. */
+.viewer-content { position: relative; margin: 0 auto; }
+.viewer-content img, .viewer-content canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.viewer-content.pixelated img, .viewer-content.pixelated canvas { image-rendering: pixelated; }
 /* Until the first result arrives there is nothing to show (not a broken-image icon). */
-.live-image img:not([src]) { visibility: hidden; height: 120px; }
-.live.updating .live-image img { opacity: 0.55; }
+.viewer-result:not([src]) { visibility: hidden; }
+.viewer-result { transition: opacity 0.2s; }
+.live.updating .viewer-result { opacity: 0.55; }
+
+.compare-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 26px;
+  margin-left: -13px;
+  cursor: ew-resize;
+  /* a thin white line in the middle of a wider grab area */
+  background: linear-gradient(to right, transparent 12px, #fff 12px 14px, transparent 14px);
+  filter: drop-shadow(0 0 3px rgb(0 0 0 / 0.7));
+}
+.compare-handle::after {
+  content: '⇆';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #16151f;
+  font-size: 0.9rem;
+}
+.compare-tag {
+  position: absolute;
+  top: 8px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.compare-tag.before { right: 20px; }
+.compare-tag.after { left: 20px; }
+.group.compact { gap: 4px; flex-wrap: nowrap; }
+.group.compact button { padding: 3px 9px; font-size: 0.8rem; }
+[data-compare][aria-pressed="true"] { color: var(--accent); }
 .live-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
 .live-meta { font: 0.85rem var(--mono); color: var(--muted); overflow-wrap: anywhere; }
 .live-meta.ok { color: var(--ok); }

@@ -4,6 +4,7 @@ import { $, $$, bindOptions, formatBytes, loadSettings, saveSettings } from '../
 import { upload } from '../api.js';
 import { createResult, triggerDownload } from '../result.js';
 import { fitAspect, moveRect, resizeRect, roundRect } from '../crop.js';
+import { createViewer } from '../viewer.js';
 
 const DEFAULTS = {
   format: 'webp',
@@ -157,13 +158,14 @@ export function init(section) {
   // --- One image: the live result ----------------------------------------------------------------
 
   const live = $('[data-live]', form);
-  const liveImg = $('[data-live-img]', form);
+  const viewer = createViewer(live);
   const liveMeta = $('[data-live-meta]', form);
   const download = $('[data-download]', form);
   let kept = null; // { file, promise of the upload id }
   let previewTimer = null;
   let previewAbort = null;
   let resultBlob = null;
+  let resultUrl = null;
 
   const setLive = (text, kind = '') => {
     liveMeta.textContent = text;
@@ -174,8 +176,9 @@ export function init(section) {
     clearTimeout(previewTimer);
     previewAbort?.abort();
     resultBlob = null;
-    if (liveImg.src) URL.revokeObjectURL(liveImg.src);
-    liveImg.removeAttribute('src');
+    if (resultUrl) URL.revokeObjectURL(resultUrl);
+    resultUrl = null;
+    viewer.reset();
     download.removeAttribute('href');
     setLive('');
   }
@@ -208,6 +211,8 @@ export function init(section) {
     previewAbort?.abort();
     const abort = (previewAbort = new AbortController());
     const options = { format: state.format, quality: state.quality, metadata: state.metadata, ...editor.edits() };
+    // The original, framed as this request (cropped, rotated, flipped), for the comparison.
+    const frame = editor.frame();
 
     const request = async (fresh) => {
       const id = await keptUpload(file, { fresh });
@@ -230,9 +235,12 @@ export function init(section) {
       resultBlob = await res.blob();
       if (abort.signal.aborted) return;
 
-      URL.revokeObjectURL(liveImg.src);
-      liveImg.src = URL.createObjectURL(resultBlob);
-      download.href = liveImg.src;
+      if (resultUrl) URL.revokeObjectURL(resultUrl);
+      resultUrl = URL.createObjectURL(resultBlob);
+      viewer.show(resultUrl, meta, (ctx, width, height) =>
+        ctx.drawImage(frame.canvas, frame.x, frame.y, frame.w, frame.h, 0, 0, width, height),
+      );
+      download.href = resultUrl;
       download.download = meta.name;
       setLive(
         `${meta.format} · ${meta.width} × ${meta.height} · ${formatBytes(meta.size)} (${sizeChange(file.size, meta.size)})`,
@@ -495,6 +503,11 @@ function createEditor(form, state, { onChange, onError }) {
       bitmap?.close();
       bitmap = null;
       crop = null;
+    },
+
+    /** The picture as the editor shows it (rotated, flipped) and the crop in it, in whole pixels. */
+    frame() {
+      return { canvas, ...roundRect(crop, canvas.width, canvas.height) };
     },
 
     /** The edits for the server; crop and size only when they change something. */

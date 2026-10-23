@@ -434,10 +434,25 @@
 
         <!-- The exact result of the one image, updated as you change things -->
         <div class="live" data-live hidden>
-          <div class="live-image"><img data-live-img alt="Result"></div>
+          <div class="viewer" data-viewport title="Double-click to zoom; Ctrl + wheel to zoom where you point">
+            <div class="viewer-content" data-viewer-content>
+              <canvas class="viewer-before" data-before hidden></canvas>
+              <img class="viewer-result" data-live-img alt="Result">
+              <div class="compare-handle" data-compare-handle hidden>
+                <span class="compare-tag before">original</span>
+                <span class="compare-tag after">result</span>
+              </div>
+            </div>
+          </div>
           <div class="live-bar">
             <span class="live-meta" data-live-meta></span>
             <span class="live-actions">
+              <span class="group compact" role="group" aria-label="Zoom">
+                <button type="button" data-zoom="fit" title="Fit the whole image">fit</button>
+                <button type="button" data-zoom="1" title="Actual pixels">100%</button>
+                <button type="button" data-zoom="2" title="Twice the actual size">200%</button>
+              </span>
+              <button type="button" class="ghost small" data-compare aria-pressed="false" title="Compare with the original">compare</button>
               <button type="button" class="ghost small" data-copy title="Copy the image to paste it elsewhere">copy</button>
               <a class="live-download" data-download>download</a>
             </span>
