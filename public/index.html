@@ -17,7 +17,6 @@
     <symbol id="i-audio" viewBox="0 0 24 24"><path d="M4 10v4m4-8v12m4-15v18m4-13v8m4-5v2"/></symbol>
     <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17.5 5-4.5 4 3.5 2.5-2 4.5 3.5"/></symbol>
     <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M6.5 3.5h7l4 4v13h-11z"/><path d="M13.5 3.5v4h4M9 12.5h6M9 16h6"/></symbol>
-    <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6.5 2.5v13a2 2 0 0 0 2 2h13M2.5 6.5h13a2 2 0 0 1 2 2v13"/></symbol>
     <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 4.5v7.4a1 1 0 0 0 .3.7l8.6 8.6a1 1 0 0 0 1.4 0l6.9-6.9a1 1 0 0 0 0-1.4l-8.6-8.6a1 1 0 0 0-.7-.3H4.5a1 1 0 0 0-1 1z"/><circle cx="8.5" cy="8.5" r="1.5"/></symbol>
   </svg>
 
@@ -49,11 +48,7 @@
       </button>
       <button type="button" role="tab" class="nav-item" data-tool="image">
         <svg aria-hidden="true"><use href="#i-image"/></svg>
-        <span class="nav-label">Convert images</span><span class="nav-short">Images</span>
-      </button>
-      <button type="button" role="tab" class="nav-item" data-tool="edit">
-        <svg aria-hidden="true"><use href="#i-crop"/></svg>
-        <span class="nav-label">Edit image</span><span class="nav-short">Edit</span>
+        <span class="nav-label">Images</span><span class="nav-short">Images</span>
       </button>
       <button type="button" role="tab" class="nav-item" data-tool="pdf">
         <svg aria-hidden="true"><use href="#i-pdf"/></svg>
@@ -325,18 +320,20 @@
       <div class="result-slot"></div>
     </section>
 
-    <!-- Image converter -->
+    <!-- Images: one image opens the editor with a live result; several are converted together. -->
     <section id="tool-image" class="tool" role="tabpanel" hidden>
       <header class="tool-head">
-        <h1>Convert images</h1>
-        <p>Convert, resize and compress many images at once.</p>
+        <h1>Images</h1>
+        <p>Convert, resize and compress images, or edit one: crop, rotate, flip.</p>
       </header>
       <form autocomplete="off">
         <label class="dropzone" data-dropzone>
           <input name="files" type="file" accept="image/*" multiple hidden>
-          <span>drop images here or click to choose them</span>
+          <span data-drop-label>drop one image to edit it, or several to convert them together</span>
         </label>
+        <p class="hint" data-image-hint hidden></p>
 
+        <!-- Several images -->
         <div class="file-list" data-file-list hidden>
           <div class="file-list-head">
             <span data-file-count></span>
@@ -345,59 +342,7 @@
           <ul class="thumbs" data-thumbs></ul>
         </div>
 
-        <div class="options">
-          <label>format
-            <div class="group" data-key="format">
-              <button type="button" data-value="original" title="Keep each image's format">same</button>
-              <button type="button" data-value="jpg">jpg</button>
-              <button type="button" data-value="png" title="Lossless">png</button>
-              <button type="button" data-value="webp" title="Smaller than jpg, with transparency">webp</button>
-              <button type="button" data-value="avif" title="Smallest; slower, and older apps can't open it">avif</button>
-            </div>
-          </label>
-          <label data-show-when="format!=png">quality
-            <span class="slider">
-              <input name="quality" type="range" min="1" max="100" step="1" aria-label="Quality">
-              <span class="slider-value" data-quality-value></span>
-            </span>
-          </label>
-          <label>max size
-            <div class="group" data-key="maxSize">
-              <button type="button" data-value="original">original</button>
-              <button type="button" data-value="3840">3840</button>
-              <button type="button" data-value="2560">2560</button>
-              <button type="button" data-value="1920">1920</button>
-              <button type="button" data-value="1280">1280</button>
-              <button type="button" data-value="800">800</button>
-              <button type="button" data-value="400">400</button>
-            </div>
-          </label>
-          <label>metadata
-            <div class="group" data-key="metadata">
-              <button type="button" data-value="remove" title="Drops EXIF data such as the camera and the GPS location">remove</button>
-              <button type="button" data-value="keep">keep</button>
-            </div>
-          </label>
-        </div>
-
-        <button type="submit" class="go wide">convert</button>
-      </form>
-      <div class="result-slot"></div>
-    </section>
-
-    <!-- Edit image -->
-    <section id="tool-edit" class="tool" role="tabpanel" hidden>
-      <header class="tool-head">
-        <h1>Edit image</h1>
-        <p>Crop, rotate, flip and resize an image.</p>
-      </header>
-      <form autocomplete="off">
-        <label class="dropzone" data-dropzone>
-          <input name="file" type="file" accept="image/*" hidden>
-          <span data-file-label>drop an image here or click to choose one</span>
-        </label>
-        <p class="hint" data-edit-hint hidden></p>
-
+        <!-- One image -->
         <div class="editor" data-editor hidden>
           <div class="group" role="group" aria-label="Rotate and flip">
             <button type="button" data-action="rotate-left" title="Rotate left">↺ rotate</button>
@@ -431,40 +376,75 @@
             </div>
           </div>
           <p class="hint" data-crop-info></p>
-
-          <div class="options">
-            <label>size
-              <span class="size-row">
-                <span class="time-input size-input">
-                  <input name="outWidth" type="number" min="1" max="16384" step="1" aria-label="Width in pixels">
-                  <span class="unit">px</span>
-                </span>
-                <span class="times">×</span>
-                <span class="time-input size-input">
-                  <input name="outHeight" type="number" min="1" max="16384" step="1" aria-label="Height in pixels">
-                  <span class="unit">px</span>
-                </span>
-                <span class="group">
-                  <button type="button" data-scale="1">100%</button>
-                  <button type="button" data-scale="0.75">75%</button>
-                  <button type="button" data-scale="0.5">50%</button>
-                  <button type="button" data-scale="0.25">25%</button>
-                </span>
-              </span>
-            </label>
-            <label>format
-              <div class="group" data-key="format">
-                <button type="button" data-value="original" title="Keep the image's format">same</button>
-                <button type="button" data-value="jpg">jpg</button>
-                <button type="button" data-value="png">png</button>
-                <button type="button" data-value="webp">webp</button>
-                <button type="button" data-value="avif">avif</button>
-              </div>
-            </label>
-          </div>
-
-          <button type="submit" class="go wide">save image</button>
         </div>
+
+        <div class="options" data-options hidden>
+          <label>format
+            <div class="group" data-key="format">
+              <button type="button" data-value="original" title="Keep each image's format">same</button>
+              <button type="button" data-value="jpg">jpg</button>
+              <button type="button" data-value="png" title="Lossless">png</button>
+              <button type="button" data-value="webp" title="Smaller than jpg, with transparency">webp</button>
+              <button type="button" data-value="avif" title="Smallest; slower, and older apps can't open it">avif</button>
+            </div>
+          </label>
+          <label data-show-when="format!=png">quality
+            <span class="slider">
+              <input name="quality" type="range" min="1" max="100" step="1" aria-label="Quality">
+              <span class="slider-value" data-quality-value></span>
+            </span>
+          </label>
+          <label data-single>size
+            <span class="size-row">
+              <span class="time-input size-input">
+                <input name="outWidth" type="number" min="1" max="16384" step="1" aria-label="Width in pixels">
+                <span class="unit">px</span>
+              </span>
+              <span class="times">×</span>
+              <span class="time-input size-input">
+                <input name="outHeight" type="number" min="1" max="16384" step="1" aria-label="Height in pixels">
+                <span class="unit">px</span>
+              </span>
+              <span class="group">
+                <button type="button" data-scale="1">100%</button>
+                <button type="button" data-scale="0.75">75%</button>
+                <button type="button" data-scale="0.5">50%</button>
+                <button type="button" data-scale="0.25">25%</button>
+              </span>
+            </span>
+          </label>
+          <label data-batch>max size
+            <div class="group" data-key="maxSize">
+              <button type="button" data-value="original">original</button>
+              <button type="button" data-value="3840">3840</button>
+              <button type="button" data-value="2560">2560</button>
+              <button type="button" data-value="1920">1920</button>
+              <button type="button" data-value="1280">1280</button>
+              <button type="button" data-value="800">800</button>
+              <button type="button" data-value="400">400</button>
+            </div>
+          </label>
+          <label>metadata
+            <div class="group" data-key="metadata">
+              <button type="button" data-value="remove" title="Drops EXIF data such as the camera and the GPS location">remove</button>
+              <button type="button" data-value="keep">keep</button>
+            </div>
+          </label>
+        </div>
+
+        <!-- The exact result of the one image, updated as you change things -->
+        <div class="live" data-live hidden>
+          <div class="live-image"><img data-live-img alt="Result"></div>
+          <div class="live-bar">
+            <span class="live-meta" data-live-meta></span>
+            <span class="live-actions">
+              <button type="button" class="ghost small" data-copy title="Copy the image to paste it elsewhere">copy</button>
+              <a class="live-download" data-download>download</a>
+            </span>
+          </div>
+        </div>
+
+        <button type="submit" class="go wide" data-batch>convert</button>
       </form>
       <div class="result-slot"></div>
     </section>

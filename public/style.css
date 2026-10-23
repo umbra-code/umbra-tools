@@ -465,6 +465,44 @@ textarea {
 .crop-handle.sw { left: -2px; bottom: -2px; border-width: 0 0 4px 4px; cursor: nesw-resize; }
 .crop-handle.se { right: -2px; bottom: -2px; border-width: 0 4px 4px 0; cursor: nwse-resize; }
 .times { color: var(--muted); }
+
+/* The live result of the one image being edited. */
+.live {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.live-image {
+  display: flex;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: repeating-conic-gradient(var(--surface-2) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+}
+.live-image img { display: block; max-width: 100%; max-height: 50vh; transition: opacity 0.2s; }
+/* Until the first result arrives there is nothing to show (not a broken-image icon). */
+.live-image img:not([src]) { visibility: hidden; height: 120px; }
+.live.updating .live-image img { opacity: 0.55; }
+.live-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.live-meta { font: 0.85rem var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.live-meta.ok { color: var(--ok); }
+.live-meta.warn { color: var(--warn); }
+.live-meta.error { color: var(--error); font-family: var(--font); }
+.live-actions { display: flex; align-items: center; gap: 10px; }
+.live-download {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
+  color: var(--accent-text);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.live-download:not([href]) { opacity: 0.4; pointer-events: none; }
 /* Width × height stay on one line, also on phones (where other fields go full width). */
 .size-row .size-input { width: 120px; }
 .editor > .hint { text-align: center; padding-bottom: 0; }
