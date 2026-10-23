@@ -28,6 +28,20 @@ export const MIME_TYPES = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/we
 /** Formats that keep every frame of an animation (the others take the first one). */
 export const ANIMATED_FORMATS = ['webp', 'gif'];
 
+/** Largest weight the automatic quality aims at, in KB (100 MB). */
+export const MAX_KB = 100 * 1024;
+
+/** 'auto' (found to fit a maximum weight) or a whole number from 1 to 100 (80 when blank). */
+function parseQuality(value) {
+  if (value == null || value === '') return DEFAULT_QUALITY;
+  if (value === 'auto') return 'auto';
+  const quality = Number(value);
+  if (!Number.isInteger(quality) || quality < 1 || quality > 100) {
+    throw httpError(400, 'Quality must be a whole number from 1 to 100, or auto');
+  }
+  return quality;
+}
+
 const EDIT_OPTIONS = {
   rotate: ['0', '90', '180', '270'],
   flipH: ['0', '1'],
@@ -52,9 +66,10 @@ function wholeNumber(value, name, min, max) {
  */
 export function parseOptions(body = {}) {
   const options = pickAllowed(body, OPTIONS, DEFAULTS);
-  const quality = body.quality == null || body.quality === '' ? DEFAULT_QUALITY : Number(body.quality);
-  if (!Number.isInteger(quality) || quality < 1 || quality > 100) {
-    throw httpError(400, 'Quality must be a whole number from 1 to 100');
+  const quality = parseQuality(body.quality);
+  const maxKb = body.maxKb == null || body.maxKb === '' ? null : Number(body.maxKb);
+  if (quality === 'auto' && !(Number.isFinite(maxKb) && maxKb >= 1 && maxKb <= MAX_KB)) {
+    throw httpError(400, `For automatic quality, give a maximum size from 1 to ${MAX_KB} KB`);
   }
 
   const edits = pickAllowed(body, EDIT_OPTIONS, EDIT_DEFAULTS);
@@ -67,6 +82,7 @@ export function parseOptions(body = {}) {
   return {
     ...options,
     quality,
+    maxKb: quality === 'auto' ? maxKb : null,
     rotate: Number(edits.rotate),
     flipH: edits.flipH === '1',
     flipV: edits.flipV === '1',
@@ -118,9 +134,11 @@ export function resolveFormat(input, chosen) {
 
 /**
  * The sharp encoder and its settings for `format` at `quality` (1–100, like JPEG's scale).
- * PNG, GIF and TIFF are lossless here, so the quality does not apply.
+ * PNG, GIF and TIFF are lossless here, so the quality does not apply — except for PNG with
+ * `palette`, where colors are reduced to a palette and the quality decides how faithfully.
+ * `effort` overrides AVIF's and the palette PNG's (lower is faster and bigger).
  */
-export function encoderFor(format, quality) {
+export function encoderFor(format, quality, { palette = false, effort } = {}) {
   switch (format) {
     case 'jpg':
       return ['jpeg', { quality, mozjpeg: true }];
@@ -128,9 +146,11 @@ export function encoderFor(format, quality) {
       return ['webp', { quality, effort: 5 }];
     case 'avif':
       // AVIF's scale is harsher: its default of 50 looks about like JPEG at 80.
-      return ['avif', { quality: Math.max(1, Math.round(quality * 0.625)), effort: 4 }];
+      return ['avif', { quality: Math.max(1, Math.round(quality * 0.625)), effort: effort ?? 4 }];
     case 'png':
-      return ['png', { compressionLevel: 9, effort: 7 }];
+      return palette
+        ? ['png', { palette: true, quality, colors: 256, compressionLevel: 9, effort: effort ?? 7 }]
+        : ['png', { compressionLevel: 9, effort: 7 }];
     case 'gif':
       return ['gif', { effort: 7 }];
     default:

@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { convertImage, describeImageError, renderImage } from './convert.js';
+import { convertImage, describeImageError, renderImage, shrinkFactor } from './convert.js';
 import {
   DEFAULT_QUALITY,
   DEFAULTS,
@@ -20,8 +20,17 @@ const NO_EDITS = { rotate: 0, flipH: false, flipV: false, crop: null, width: nul
 
 describe('parseOptions', () => {
   it('uses the defaults: no edits', () => {
-    expect(parseOptions({})).toEqual({ ...DEFAULTS, quality: DEFAULT_QUALITY, ...NO_EDITS });
+    expect(parseOptions({})).toEqual({ ...DEFAULTS, quality: DEFAULT_QUALITY, maxKb: null, ...NO_EDITS });
     expect(hasEdits(parseOptions({}))).toBe(false);
+  });
+
+  it('takes an automatic quality with a maximum weight', () => {
+    expect(parseOptions({ quality: 'auto', maxKb: '500' })).toMatchObject({ quality: 'auto', maxKb: 500 });
+    // The weight only matters with automatic quality.
+    expect(parseOptions({ quality: '70', maxKb: '500' }).maxKb).toBeNull();
+    for (const body of [{ quality: 'auto' }, { quality: 'auto', maxKb: '0' }, { quality: 'auto', maxKb: 'lots' }]) {
+      expect(() => parseOptions(body)).toThrow(expect.objectContaining({ status: 400 }));
+    }
   });
 
   it('keeps allowed values and the quality', () => {
@@ -134,7 +143,78 @@ describe('editing one image', () => {
   it('previews a kept upload with its format, size and weight', async () => {
     const { data, contentType, meta } = await imageTool.preview({ path: quadrants, name: 'quadrants.png' }, { ...base, format: 'webp', rotate: 90 });
     expect(contentType).toBe('image/webp');
-    expect(meta).toEqual({ format: 'webp', width: 100, height: 200, size: data.length, name: 'quadrants.webp' });
+    expect(meta).toEqual({ format: 'webp', width: 100, height: 200, size: data.length, quality: 80, scale: 1, name: 'quadrants.webp' });
+  });
+
+  describe('automatic quality', () => {
+    let photo;
+    // A noisy picture, so quality changes the weight a lot (as with real photos).
+    beforeAll(async () => {
+      const [width, height] = [800, 600];
+      const data = Buffer.alloc(width * height * 3);
+      let seed = 7;
+      for (let i = 0; i < data.length; i++) {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        data[i] = (i % 3 === 0 ? (i / 3) % width : 128) / 2 + (seed % 96);
+      }
+      photo = path.join(dir, 'noisy.png');
+      await sharp(data, { raw: { width, height, channels: 3 } }).png().toFile(photo);
+    });
+    const auto = (format, maxKb, extra = {}) => renderImage(photo, { ...parseOptions({}), format, quality: 'auto', maxKb, ...extra });
+
+    it('finds the best quality that fits the weight', async () => {
+      const result = await auto('jpg', 60);
+      expect(result.data.length).toBeLessThanOrEqual(60 * 1024);
+      expect(result.quality).toBeGreaterThan(1);
+      expect(result.quality).toBeLessThan(100);
+      expect(result.scale).toBe(1);
+      // One step more of quality would not fit: it really is the best.
+      const above = await renderImage(photo, { ...parseOptions({}), format: 'jpg', quality: result.quality + 1 });
+      expect(above.data.length).toBeGreaterThan(60 * 1024);
+    });
+
+    it('uses the top quality when there is room to spare', async () => {
+      expect((await auto('webp', 100 * 1024)).quality).toBe(100);
+    });
+
+    it('fits AVIF too (searching with less effort)', async () => {
+      const result = await auto('avif', 20);
+      expect(result.data.length).toBeLessThanOrEqual(20 * 1024);
+    });
+
+    it('reduces PNG colors to a palette to fit', async () => {
+      const lossless = await renderImage(photo, { ...parseOptions({}), format: 'png' });
+      const target = Math.floor((lossless.data.length * 0.5) / 1024);
+      const result = await auto('png', target);
+      expect(result.data.length).toBeLessThanOrEqual(target * 1024);
+      expect((await sharp(result.data).metadata()).isPalette).toBe(true);
+    });
+
+    it('makes the picture smaller when not even the lowest quality fits', async () => {
+      const result = await auto('jpg', 1);
+      expect(result.data.length).toBeLessThanOrEqual(1024);
+      expect(result.scale).toBeLessThan(1);
+      expect(result.width).toBeLessThan(800);
+      expect(result.width / result.height).toBeCloseTo(800 / 600, 1);
+    });
+
+    it('stops searching when the work is no longer wanted', async () => {
+      const abort = new AbortController();
+      abort.abort();
+      await expect(renderImage(photo, { ...parseOptions({}), format: 'jpg', quality: 'auto', maxKb: 60 }, { signal: abort.signal })).rejects.toThrow();
+    });
+
+    it('works together with the edits', async () => {
+      const result = await auto('webp', 10, { rotate: 90, crop: { left: 0, top: 0, width: 300, height: 400 } });
+      expect(result.data.length).toBeLessThanOrEqual(10 * 1024);
+      expect(result.width / result.height).toBeCloseTo(300 / 400, 1);
+    });
+  });
+
+  it('shrinks by about the square root of the excess (weight follows the area), within limits', () => {
+    expect(shrinkFactor(25, 100)).toBeCloseTo(0.45);
+    expect(shrinkFactor(81, 100)).toBeCloseTo(0.81);
+    expect(shrinkFactor(1, 1000)).toBe(0.2);
   });
 
   it('refuses to crop a batch, where the box would land somewhere else on each image', async () => {

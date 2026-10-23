@@ -91,7 +91,20 @@ app.post('/api/tools/:tool/preview', async (req, res) => {
   const kept = getUpload(req.body?.upload);
   if (!kept) throw httpError(404, 'The file is no longer on the server; choose it again');
 
-  const { data, contentType, meta } = await tool.preview(kept, tool.parseOptions(req.body ?? {}));
+  // A newer preview replaces this one in the browser: stop working on it when it hangs up.
+  const abort = new AbortController();
+  res.on('close', () => {
+    if (!res.writableFinished) abort.abort();
+  });
+
+  let result;
+  try {
+    result = await tool.preview(kept, tool.parseOptions(req.body ?? {}), { signal: abort.signal });
+  } catch (err) {
+    if (abort.signal.aborted) return; // nobody is listening anymore
+    throw err;
+  }
+  const { data, contentType, meta } = result;
   res.set({ 'Content-Type': contentType, 'Cache-Control': 'no-store', 'X-Result': encodeURIComponent(JSON.stringify(meta)) }).send(data);
 });
 

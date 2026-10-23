@@ -13,19 +13,31 @@ export default {
   multipleOutputs: true,
   parseOptions,
 
-  /** The exact result for one kept upload, in memory, with its format, size and weight. */
-  async preview(upload, options) {
+  /**
+   * The exact result for one kept upload, in memory, with its format, size and weight.
+   * `signal` stops the work when the client no longer waits for it.
+   */
+  async preview(upload, options, { signal } = {}) {
     let result;
     try {
-      result = await renderImage(upload.path, options);
+      result = await renderImage(upload.path, options, { signal });
     } catch (err) {
+      if (signal?.aborted) throw err;
       throw httpError(422, describeImageError(err, upload.name));
     }
-    const { data, format, width, height } = result;
+    const { data, format, width, height, quality, scale } = result;
     return {
       data,
       contentType: MIME_TYPES[format],
-      meta: { format, width, height, size: data.length, name: `${stripExtension(upload.name)}.${EXTENSIONS[format]}` },
+      meta: {
+        format,
+        width,
+        height,
+        size: data.length,
+        quality,
+        scale,
+        name: `${stripExtension(upload.name)}.${EXTENSIONS[format]}`,
+      },
     };
   },
 
@@ -41,8 +53,8 @@ export default {
     for (const [i, file] of ctx.files.entries()) {
       if (ctx.cancelled) return;
       try {
-        const { output, width, height } = await convertImage(file.path, file.name, ctx.outDir, ctx.options);
-        results.push({ name: file.name, output: path.basename(output), size: fs.statSync(output).size, width, height });
+        const { output, width, height, quality, scale } = await convertImage(file.path, file.name, ctx.outDir, ctx.options);
+        results.push({ name: file.name, output: path.basename(output), size: fs.statSync(output).size, width, height, quality, scale });
       } catch (err) {
         ctx.log(`${file.name}: ${err.message}`);
         results.push({ name: file.name, error: describeImageError(err, file.name) });
