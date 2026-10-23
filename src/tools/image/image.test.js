@@ -146,7 +146,8 @@ describe('editing one image', () => {
     expect(meta).toEqual({ format: 'webp', width: 100, height: 200, size: data.length, quality: 80, scale: 1, name: 'quadrants.webp' });
   });
 
-  describe('automatic quality', () => {
+  // Each search runs several real encodes, which are much slower on CI runners (AVIF above all).
+  describe('automatic quality', { timeout: 30_000 }, () => {
     let photo;
     // A noisy picture, so quality changes the weight a lot (as with real photos).
     beforeAll(async () => {
@@ -177,7 +178,7 @@ describe('editing one image', () => {
       expect((await auto('webp', 100 * 1024)).quality).toBe(100);
     });
 
-    it('fits AVIF too (searching with less effort)', async () => {
+    it('fits AVIF too', async () => {
       const result = await auto('avif', 20);
       expect(result.data.length).toBeLessThanOrEqual(20 * 1024);
     });
