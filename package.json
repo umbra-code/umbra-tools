@@ -1,6 +1,6 @@
 {
   "name": "umbra-tools",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "private": true,
   "license": "MIT",
   "description": "Self-hosted toolbox for media and file tasks, built on yt-dlp and ffmpeg",
