@@ -1,11 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { AUDIO_KBPS, buildVideoPasses, DEFAULTS, parseOptions, targetVideoKbps, videoCodec } from './options.js';
+import {
+  AUDIO_KBPS,
+  buildReversePiece,
+  buildVideoPasses,
+  DEFAULTS,
+  parseOptions,
+  reversePieces,
+  targetVideoKbps,
+  videoCodec,
+} from './options.js';
 
 const lastValue = (args, flag) => args[args.lastIndexOf(flag) + 1];
 
 describe('parseOptions', () => {
   it('uses the whole video and defaults when nothing is given', () => {
-    expect(parseOptions({})).toEqual({ ...DEFAULTS, start: 0, end: null, targetMb: null });
+    expect(parseOptions({})).toEqual({ ...DEFAULTS, speed: 1, start: 0, end: null, targetMb: null });
+  });
+
+  it('reads the speed as a number and the direction', () => {
+    expect(parseOptions({ speed: '0.25', direction: 'reverse' })).toMatchObject({ speed: 0.25, direction: 'reverse' });
+    expect(parseOptions({ speed: '3', direction: 'sideways' })).toMatchObject({ speed: 1, direction: 'forward' });
   });
 
   it('parses the range and the target size', () => {
@@ -108,6 +122,8 @@ describe('buildVideoPasses', () => {
     expect(lastValue(args, '-ss')).toBe('12');
     expect(args.indexOf('-ss')).toBeLessThan(args.indexOf('-i'));
     expect(lastValue(args, '-t')).toBe('30');
+    // On the input: it says how much to read, so a slowed down result is not cut.
+    expect(args.indexOf('-t')).toBeLessThan(args.indexOf('-i'));
     const whole = buildVideoPasses('in.mp4', 'out.mp4', base)[0];
     expect(whole).not.toContain('-ss');
     expect(whole).not.toContain('-t');
@@ -130,5 +146,42 @@ describe('buildVideoPasses', () => {
     const [analysis] = buildVideoPasses('in.mp4', 'out.mp4', { ...base, codec: 'h265', mode: 'size', videoKbps: 900 });
     expect(lastValue(analysis, '-x265-params')).toBe('pass=1:stats=passlog');
     expect(analysis).not.toContain('-pass');
+  });
+
+  it('changes the speed of the picture and of the sound', () => {
+    const [args] = buildVideoPasses('in.mp4', 'out.mp4', { ...base, speed: 0.25, fps: '30' });
+    expect(lastValue(args, '-vf')).toBe('setpts=PTS/0.25,fps=30');
+    expect(lastValue(args, '-af')).toBe('atempo=0.5,atempo=0.5');
+    expect(buildVideoPasses('in.mp4', 'out.mp4', { ...base, speed: 1 })[0]).not.toContain('-af');
+  });
+
+  it('makes odd sides even, as GIFs often have and encoders refuse', () => {
+    const [args] = buildVideoPasses('in.gif', 'out.mp4', { ...base, hasAudio: false, oddSize: true, resolution: '720' });
+    expect(lastValue(args, '-vf')).toBe("crop=trunc(iw/2)*2:trunc(ih/2)*2,scale=-2:'min(720,ih)'");
+  });
+});
+
+describe('reversePieces', () => {
+  it('covers the range in pieces, last piece first', () => {
+    const pieces = reversePieces(1, 24, { width: 640, height: 360, resolution: 'original' });
+    expect(pieces.map((p) => p.seek)).toEqual([21, 11, 1]);
+    expect(pieces.map((p) => p.duration)).toEqual([3, 10, 10]);
+  });
+
+  it('uses shorter pieces for bigger pictures, so they fit in memory', () => {
+    const big = reversePieces(0, 10, { width: 3840, height: 2160, resolution: 'original' });
+    const shrunk = reversePieces(0, 10, { width: 3840, height: 2160, resolution: '480' });
+    expect(big[0].duration).toBe(1);
+    expect(shrunk[0].duration).toBeGreaterThan(big[0].duration);
+  });
+});
+
+describe('buildReversePiece', () => {
+  it('cuts the piece, brings it to its size and reverses picture and sound', () => {
+    const args = buildReversePiece('in.mp4', 'piece.mkv', { seek: 10, duration: 2, keepAudio: true, resolution: '720' });
+    expect(args.indexOf('-ss')).toBeLessThan(args.indexOf('-i'));
+    expect(lastValue(args, '-vf')).toBe("scale=-2:'min(720,ih)',reverse");
+    expect(lastValue(args, '-af')).toBe('areverse');
+    expect(buildReversePiece('in.mp4', 'piece.mkv', { seek: 0, duration: 2, keepAudio: false, resolution: 'original' })).toContain('-an');
   });
 });

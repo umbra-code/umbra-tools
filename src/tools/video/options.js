@@ -1,6 +1,7 @@
 // Video converter options and ffmpeg arguments (pure, so they can be tested without ffmpeg).
 import { httpError } from '../../core/errors.js';
 import { pickAllowed } from '../../core/input.js';
+import { SPEEDS, speedAudioFilter, speedVideoFilter } from '../../core/media.js';
 import { parseRange } from '../../core/time.js';
 
 export const OPTIONS = {
@@ -11,6 +12,8 @@ export const OPTIONS = {
   audio: ['keep', 'remove'],
   mode: ['quality', 'size'],
   quality: ['high', 'balanced', 'small'],
+  speed: SPEEDS,
+  direction: ['forward', 'reverse'],
 };
 
 export const DEFAULTS = {
@@ -21,7 +24,13 @@ export const DEFAULTS = {
   audio: 'keep',
   mode: 'quality',
   quality: 'balanced',
+  speed: '1',
+  direction: 'forward',
 };
+
+/** Decoded frames a reversed piece may hold in memory (ffmpeg keeps all of them to reverse). */
+const REVERSE_BYTES = 512 * 1024 * 1024;
+const MAX_PIECE_SECONDS = 10;
 
 export const AUDIO_KBPS = 128;
 export const MAX_TARGET_MB = 10_000;
@@ -48,7 +57,7 @@ export function parseOptions(body = {}) {
     }
   }
 
-  return { ...options, start, end, targetMb };
+  return { ...options, speed: Number(options.speed), start, end, targetMb };
 }
 
 /** webm always uses VP9; mp4 and mkv use the chosen codec. */
@@ -73,6 +82,52 @@ const ENCODERS = {
   vp9: ['-c:v', 'libvpx-vp9', '-deadline', 'good', '-cpu-used', '4', '-row-mt', '1'],
 };
 
+/**
+ * Filters for the size of the picture. Encoders need even sides, which GIFs often do not
+ * have (`oddSize`): those lose their last row or column. Never upscale: smaller sources keep
+ * their size, and -2 keeps the width even.
+ */
+const sizeFilters = ({ resolution, oddSize }) =>
+  [oddSize && 'crop=trunc(iw/2)*2:trunc(ih/2)*2', resolution !== 'original' && `scale=-2:'min(${resolution},ih)'`].filter(
+    Boolean,
+  );
+
+/**
+ * Splits `start`–`end` into pieces short enough to reverse in memory, given the size of the
+ * picture (`width` × `height`, before `resolution` shrinks it). Returned last piece first:
+ * reversing each one and joining them in this order reverses the whole range.
+ */
+export function reversePieces(start, end, { width, height, resolution }) {
+  const outHeight = resolution === 'original' ? height : Math.min(Number(resolution), height);
+  const outWidth = (width * outHeight) / height;
+  // yuv420 frames take 1.5 bytes per pixel; up to 60 of them per second.
+  const seconds = Math.min(MAX_PIECE_SECONDS, Math.max(1, Math.floor(REVERSE_BYTES / (outWidth * outHeight * 1.5 * 60))));
+  const pieces = [];
+  for (let at = start; end - at > 0.001; at += seconds) pieces.push({ seek: at, duration: Math.min(seconds, end - at) });
+  return pieces.reverse();
+}
+
+/**
+ * ffmpeg arguments to write one piece of `input`, reversed, into `output` (mkv). The picture
+ * is already brought to its final size, so reversing keeps fewer bytes in memory, and stored
+ * almost losslessly; the real encode happens later, on the joined pieces.
+ */
+export function buildReversePiece(input, output, { seek, duration, keepAudio, resolution, oddSize }) {
+  return [
+    '-hide_banner',
+    '-nostdin',
+    '-y',
+    '-ss', String(seek),
+    '-t', String(duration),
+    '-i', input,
+    '-map', '0:v:0',
+    '-vf', [...sizeFilters({ resolution, oddSize }), 'reverse'].join(','),
+    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '14', '-pix_fmt', 'yuv420p',
+    ...(keepAudio ? ['-map', '0:a:0', '-af', 'areverse', '-c:a', 'pcm_s16le'] : ['-an']),
+    output,
+  ];
+}
+
 /** "-pass N" for the chosen encoder; x265 takes it through its own parameters. */
 function passArgs(codec, pass) {
   if (codec === 'h265') return ['-x265-params', `pass=${pass}:stats=passlog`];
@@ -84,11 +139,12 @@ function passArgs(codec, pass) {
  * encode) for a target size. Each run is an argument list. Two-pass runs write their stats
  * as "passlog*" in the working directory, so ffmpeg must run with `cwd` set to a temp dir.
  *
- * `seek`/`duration` select the range; `videoKbps` is required for mode "size";
- * `hasAudio` says whether the input has an audio track to keep.
+ * `seek`/`duration` select the range of the input; `videoKbps` is required for mode "size";
+ * `hasAudio` says whether the input has an audio track to keep; `oddSize` whether the picture
+ * has an odd side. `speed` plays it faster or slower (the audio keeps its pitch).
  */
 export function buildVideoPasses(input, output, options) {
-  const { format, resolution, fps, audio, mode, quality, seek = 0, duration, videoKbps, hasAudio } = options;
+  const { format, fps, audio, mode, quality, speed = 1, seek = 0, duration, videoKbps, hasAudio } = options;
   const codec = videoCodec(options);
 
   const head = [
@@ -98,16 +154,13 @@ export function buildVideoPasses(input, output, options) {
     '-progress', 'pipe:1',
     '-nostats',
     ...(seek > 0 ? ['-ss', String(seek)] : []),
-    '-i', input,
+    // Before the input, so it limits what is read and not the (maybe slowed down) result.
     ...(duration ? ['-t', String(duration)] : []),
+    '-i', input,
     '-map', '0:v:0',
   ];
 
-  // Never upscale: smaller sources keep their size. -2 keeps the width even, as encoders need.
-  const filters = [
-    resolution !== 'original' && `scale=-2:'min(${resolution},ih)'`,
-    fps !== 'original' && `fps=${fps}`,
-  ].filter(Boolean);
+  const filters = [...sizeFilters(options), speedVideoFilter(speed), fps !== 'original' && `fps=${fps}`].filter(Boolean);
   const video = [
     ...(filters.length ? ['-vf', filters.join(',')] : []),
     ...ENCODERS[codec],
@@ -116,8 +169,14 @@ export function buildVideoPasses(input, output, options) {
   ];
 
   const keepAudio = audio === 'keep' && hasAudio;
+  const tempo = speedAudioFilter(speed);
   const audioArgs = keepAudio
-    ? ['-map', '0:a:0', '-c:a', format === 'webm' ? 'libopus' : 'aac', '-b:a', `${AUDIO_KBPS}k`]
+    ? [
+        '-map', '0:a:0',
+        ...(tempo ? ['-af', tempo] : []),
+        '-c:a', format === 'webm' ? 'libopus' : 'aac',
+        '-b:a', `${AUDIO_KBPS}k`,
+      ]
     : ['-an'];
   const container = format === 'mp4' ? ['-movflags', '+faststart'] : [];
 
