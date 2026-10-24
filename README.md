@@ -9,8 +9,8 @@ Everything runs on your machine, so files never leave it and there are no upload
 | Tool | Status | Description |
 |------|--------|-------------|
 | [Media downloader](#media-downloader) | ✅ available | Save video or audio from a link, on any [site supported by yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) |
-| [Video → GIF](#video--gif) | ✅ available | Turn a time range of a video file or link into a GIF or animated WebP |
-| [Video converter](#video-converter) | ✅ available | Trim, resize, change format/codec and compress, also to a target file size |
+| [Video → GIF](#video--gif) | ✅ available | Turn a time range of a video file or link into a GIF or animated WebP, faster, slower, reversed or as a boomerang |
+| [Video converter](#video-converter) | ✅ available | Trim, resize, change format/codec, speed or direction and compress, also to a target file size; GIF → MP4 |
 | [Audio converter](#audio-converter) | ✅ available | Convert, trim, downmix and normalize audio, or extract it from a video |
 | [Images](#images) | ✅ available | Crop, rotate, resize and convert an image with a live result, or many at once; fit them to a file size |
 | [PDF](#pdf) | ✅ available | Merge PDFs, turn images into a PDF, extract pages |
@@ -94,6 +94,8 @@ GIF or animated WebP. Built on ffmpeg.
 | fps    | 10, 15, 20, 25, 30           |                                                    |
 | width  | 320, 480, 640, 800, 1080     | Smaller videos are never upscaled                  |
 | format | gif, webp                    | WebP is smaller with full color; not every app opens it |
+| speed  | 0.25×, 0.5×, 1×, 1.5×, 2×, 4× | The animation can last up to 60 s too, so slowed down the clip must be shorter |
+| direction | forward, reverse, boomerang | Boomerang plays forward and then back              |
 
 - Pick the range on a phone-style trimmer: drag the handles to move the start or the end, drag the
   selection to move both, or fine-tune with the arrow keys (Shift for 1 s steps) or by typing the times.
@@ -107,7 +109,7 @@ GIF or animated WebP. Built on ffmpeg.
 
 ## Video converter
 
-Pick a video file or a link, optionally trim it on the same trimmer as Video → GIF, and convert it.
+Pick a video file (or a GIF) or a link, optionally trim it on the same trimmer as Video → GIF, and convert it.
 
 | Option      | Values                                  | Notes                                                    |
 |-------------|-----------------------------------------|----------------------------------------------------------|
@@ -115,6 +117,8 @@ Pick a video file or a link, optionally trim it on the same trimmer as Video →
 | codec       | h.264, h.265                            | mp4 and mkv; h.265 is about half the size, slower to encode |
 | resolution  | original, 4k … 360p                     | Smaller videos are never upscaled                        |
 | fps         | original, 60, 30, 24                    |                                                          |
+| speed       | 0.25×, 0.5×, 1×, 1.5×, 2×, 4×           | The sound keeps its pitch                                |
+| direction   | forward, reverse                        | Reverses the sound too                                   |
 | audio       | keep, remove                            | Kept audio is re-encoded at 128 kbit/s (AAC, or Opus in webm) |
 | compression | by quality (high, balanced, small file) | Constant quality: the size follows the content           |
 |             | to a size (MB)                          | Two-pass encoding at the bitrate that fits the target, e.g. 10 MB to share in a chat |
@@ -122,6 +126,10 @@ Pick a video file or a link, optionally trim it on the same trimmer as Video →
 - The whole video is converted unless you trim it.
 - In "to a size" mode, the form shows the bitrate the target leaves and warns when it is too low for the length.
 - For links, the video is downloaded without re-encoding (at most at the chosen resolution) and then converted.
+- **GIF → MP4**: a GIF converted to mp4 or webm is usually many times smaller. The browser cannot preview GIFs
+  on the trimmer, so the whole animation is used unless you type a range.
+- Reversing works on pieces of a few seconds (shorter for bigger pictures), so even long videos do not need
+  much memory; it takes about as long as one more conversion.
 
 ---
 
@@ -270,8 +278,9 @@ scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
 - `POST /api/jobs` → creates a job and returns its state. Send JSON with a `url`, or multipart with one or more
   `file` fields, plus `tool` (`downloader` by default) and the tool's options:
   - `downloader`: `mode`, `videoFormat`, `quality`, `audioFormat`, `audioBitrate`, `playlist` (`video`, `all`)
-  - `gif`: `start`, `end`, `fps`, `width`, `format`
-  - `video`: `start`, `end`, `format`, `codec`, `resolution`, `fps`, `audio`, `mode`, `quality`, `targetMb`
+  - `gif`: `start`, `end`, `fps`, `width`, `format`, `speed`, `direction` (`forward`, `reverse`, `boomerang`)
+  - `video`: `start`, `end`, `format`, `codec`, `resolution`, `fps`, `audio`, `mode`, `quality`, `targetMb`, `speed`,
+    `direction` (`forward`, `reverse`)
   - `audio`: `start`, `end`, `format`, `bitrate`, `channels`, `normalize`
   - `image`: `format`, `quality` (1–100 or `auto` with `maxKb`), `maxSize`, `metadata` (one or more files);
     for one file also `rotate`, `flipH`, `flipV`, `cropX`, `cropY`, `cropWidth`, `cropHeight`, `width`, `height`
@@ -349,7 +358,7 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Image converter
 - [x] Images: editor (crop, rotate, flip, size) with a live result, zoom and compare
 - [x] Images: fit a file size (automatic quality)
-- [ ] GIF / video extras: speed, reverse, GIF → MP4
+- [x] GIF / video extras: speed, reverse, boomerang, GIF → MP4
 - [x] PDF: merge, images → PDF, extract pages
 - [x] Metadata: read, edit and clean
 - [x] Downloader: playlists
