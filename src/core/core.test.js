@@ -4,7 +4,29 @@ import os from 'node:os';
 import path from 'node:path';
 import { listFiles, safeFileName, stripExtension, uniquePath } from './files.js';
 import { parseSource, parseUrl, pickAllowed } from './input.js';
+import { SPEEDS, speedAudioFilter, speedVideoFilter } from './media.js';
 import { formatTime, parseRange, parseTime } from './time.js';
+
+describe('speed filters', () => {
+  it('chains atempo below 0.5×, its lowest step, and does nothing at 1×', () => {
+    expect(speedAudioFilter(0.25)).toBe('atempo=0.5,atempo=0.5');
+    expect(speedAudioFilter(0.5)).toBe('atempo=0.5');
+    expect(speedAudioFilter(4)).toBe('atempo=4');
+    expect(speedAudioFilter(1)).toBe('');
+    expect(speedVideoFilter(1)).toBe('');
+    expect(speedVideoFilter(1.5)).toBe('setpts=PTS/1.5');
+  });
+
+  it('gives the right tempo for every offered speed', () => {
+    for (const speed of SPEEDS.map(Number)) {
+      const tempo = speedAudioFilter(speed)
+        .split(',')
+        .filter(Boolean)
+        .reduce((total, step) => total * Number(step.split('=')[1]), 1);
+      expect(tempo).toBeCloseTo(speed);
+    }
+  });
+});
 
 describe('parseTime', () => {
   it('reads seconds, m:ss and h:mm:ss, with decimals', () => {
