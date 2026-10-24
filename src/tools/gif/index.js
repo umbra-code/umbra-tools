@@ -5,7 +5,7 @@ import { largestFile, safeFileName, stripExtension } from '../../core/files.js';
 import { ffmpegError, ffmpegProgress, probeMedia } from '../../core/media.js';
 import { formatTime } from '../../core/time.js';
 import { download } from '../downloader/ytdlp.js';
-import { buildFfmpegArgs, parseOptions } from './options.js';
+import { animationLength, buildFfmpegArgs, parseOptions } from './options.js';
 
 /** Length of the video in seconds; throws when the file has no video stream. */
 async function probeDuration(ctx, file) {
@@ -43,23 +43,25 @@ export default {
   parseOptions,
 
   async run(ctx) {
-    const { start, end, fps, width, format } = ctx.options;
+    const { start, end, format } = ctx.options;
     const duration = end - start;
+    const length = animationLength(duration, ctx.options);
     const { input, name, seek } = await getSource(ctx);
     if (ctx.cancelled) return;
 
     // ffmpeg reports progress while it writes frames, but a GIF is only written once its
-    // palette is ready (at the very end), so its progress is shown as indeterminate.
-    const tracksProgress = format === 'webp';
+    // palette is ready (at the very end), so its progress is shown as indeterminate. So is
+    // a reversed one, whose frames all come out at the end.
+    const tracksProgress = format === 'webp' && ctx.options.direction === 'forward';
     ctx.set({ attempt: 0 });
     ctx.stage('converting', tracksProgress ? 0 : null);
 
     const output = path.join(ctx.outDir, `${safeFileName(name)}.${format}`);
-    const args = buildFfmpegArgs(input, output, { seek, duration, fps, width, format });
+    const args = buildFfmpegArgs(input, output, { ...ctx.options, seek, duration });
     const { code, stderr } = await ctx.run(BINARIES.ffmpeg, args, {
       onLine: (line) => {
         if (!tracksProgress) return;
-        const progress = ffmpegProgress(line, duration);
+        const progress = ffmpegProgress(line, length);
         if (progress != null) ctx.progress(progress);
       },
     });

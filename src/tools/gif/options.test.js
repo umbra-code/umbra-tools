@@ -1,25 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { buildFfmpegArgs, DEFAULTS, MAX_SECONDS, parseOptions } from './options.js';
+import { animationFilters, animationLength, buildFfmpegArgs, DEFAULTS, MAX_SECONDS, parseOptions } from './options.js';
 
 const lastValue = (args, flag) => args[args.lastIndexOf(flag) + 1];
 
 describe('parseOptions', () => {
   it('parses the range and keeps allowed options', () => {
-    expect(parseOptions({ start: '1:05', end: '1:10.5', fps: '20', width: '640', format: 'webp' })).toEqual({
+    const body = { start: '1:05', end: '1:10.5', fps: '20', width: '640', format: 'webp', speed: '2', direction: 'boomerang' };
+    expect(parseOptions(body)).toEqual({
       start: 65,
       end: 70.5,
       fps: '20',
       width: '640',
       format: 'webp',
+      speed: 2,
+      direction: 'boomerang',
     });
   });
 
   it('starts at 0 and uses defaults when only the end is given', () => {
-    expect(parseOptions({ end: '5' })).toEqual({ ...DEFAULTS, start: 0, end: 5 });
+    expect(parseOptions({ end: '5' })).toEqual({ ...DEFAULTS, speed: 1, start: 0, end: 5 });
   });
 
   it('falls back to defaults for unknown options', () => {
-    expect(parseOptions({ end: '5', fps: '999', width: 'huge', format: 'exe' })).toMatchObject(DEFAULTS);
+    const options = parseOptions({ end: '5', fps: '999', width: 'huge', format: 'exe', speed: '100', direction: 'up' });
+    expect(options).toMatchObject({ ...DEFAULTS, speed: 1 });
+  });
+
+  it('limits the animation too, which lasts longer slowed down', () => {
+    expect(() => parseOptions({ end: String(MAX_SECONDS / 2), speed: '0.5' })).not.toThrow();
+    expect(() => parseOptions({ end: String(MAX_SECONDS / 2 + 1), speed: '0.5' })).toThrow(/At 0.5×/);
+    expect(() => parseOptions({ end: String(MAX_SECONDS), speed: '2' })).not.toThrow();
   });
 
   it('rejects invalid ranges with a 400', () => {
@@ -65,5 +75,39 @@ describe('buildFfmpegArgs', () => {
     const args = buildFfmpegArgs('in.mp4', 'out.gif', { ...options, format: 'gif' });
     expect(args).toContain('-an');
     expect(lastValue(args, '-progress')).toBe('pipe:1');
+  });
+
+  it('limits what is read, not the result, so a slowed down clip is not cut', () => {
+    const args = buildFfmpegArgs('in.mp4', 'out.gif', { ...options, format: 'gif', speed: 0.5 });
+    expect(args.indexOf('-t')).toBeLessThan(args.indexOf('-i'));
+  });
+});
+
+describe('animationFilters', () => {
+  const options = { fps: '15', width: '480' };
+
+  it('changes the speed before taking the frames, so fps is the rate of the result', () => {
+    expect(animationFilters({ ...options, speed: 2 })).toMatch(/^setpts=PTS\/2,fps=15,scale=/);
+    expect(animationFilters({ ...options, speed: 1 })).toMatch(/^fps=15,/);
+  });
+
+  it('reverses, or plays forward and back without repeating the frame where it turns', () => {
+    expect(animationFilters({ ...options, direction: 'reverse' })).toMatch(/,reverse$/);
+    const boomerang = animationFilters({ ...options, direction: 'boomerang' });
+    expect(boomerang).toContain('reverse,trim=start_frame=1');
+    expect(boomerang).toContain('concat=n=2:v=1:a=0');
+  });
+
+  it('keeps its own labels apart from the palette ones', () => {
+    const args = buildFfmpegArgs('in.mp4', 'out.gif', { ...options, duration: 4, format: 'gif', direction: 'boomerang' });
+    const labels = lastValue(args, '-vf').match(/\[\w+\]/g);
+    expect(new Set(labels)).toEqual(new Set(['[fw]', '[bw]', '[rv]', '[a]', '[b]', '[p]']));
+  });
+});
+
+describe('animationLength', () => {
+  it('follows the speed and doubles for a boomerang', () => {
+    expect(animationLength(4, { speed: 2, direction: 'forward' })).toBe(2);
+    expect(animationLength(4, { speed: 0.5, direction: 'boomerang' })).toBe(16);
   });
 });
