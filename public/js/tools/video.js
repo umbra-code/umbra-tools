@@ -12,6 +12,8 @@ const DEFAULTS = {
   audio: 'keep',
   mode: 'quality',
   quality: 'balanced',
+  speed: '1',
+  direction: 'forward',
   targetMb: '10',
 };
 
@@ -32,7 +34,8 @@ export function init(section) {
   /** For "to a size": what bitrate that leaves, so a too-small target is caught before converting. */
   const updateSizeHint = () => {
     const { start, end } = range;
-    const seconds = start != null && end != null ? end - start : null;
+    // The result lasts longer slowed down, so there is more to fit.
+    const seconds = start != null && end != null ? (end - start) / Number(state.speed) : null;
     const targetMb = Number(form.targetMb.value);
     if (!seconds || seconds <= 0 || !(targetMb > 0)) {
       sizeHint.textContent = '';
@@ -49,6 +52,8 @@ export function init(section) {
 
   // The whole video by default: converting usually means all of it.
   const media = createMediaSource(form, state, {
+    accept: 'video/*,image/gif',
+    label: 'drop a video or a GIF here or click to choose one',
     onRangeChange: (next) => {
       range = next;
       updateSizeHint();
@@ -82,8 +87,20 @@ export function init(section) {
     const missing = media.missing();
     if (missing) return result.setStatus(missing, 'error');
 
-    const { format, codec, resolution, fps, audio, mode, quality } = state;
-    const options = { tool: 'video', format, codec, resolution, fps, audio, mode, quality, targetMb: form.targetMb.value };
+    const { format, codec, resolution, fps, audio, mode, quality, speed, direction } = state;
+    const options = {
+      tool: 'video',
+      format,
+      codec,
+      resolution,
+      fps,
+      audio,
+      mode,
+      quality,
+      speed,
+      direction,
+      targetMb: form.targetMb.value,
+    };
     const go = $('.go', form);
     go.disabled = true;
     await result.run(

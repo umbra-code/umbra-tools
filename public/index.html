@@ -181,6 +181,24 @@
               <button type="button" data-value="webp" title="Smaller and with full color; not every app can open it">webp</button>
             </div>
           </label>
+          <label>speed
+            <div class="group" data-key="speed">
+              <button type="button" data-value="0.25">0.25×</button>
+              <button type="button" data-value="0.5">0.5×</button>
+              <button type="button" data-value="1">1×</button>
+              <button type="button" data-value="1.5">1.5×</button>
+              <button type="button" data-value="2">2×</button>
+              <button type="button" data-value="4">4×</button>
+            </div>
+          </label>
+          <label>direction
+            <div class="group" data-key="direction">
+              <button type="button" data-value="forward">forward</button>
+              <button type="button" data-value="reverse">reverse</button>
+              <button type="button" data-value="boomerang" title="Plays forward, then back">boomerang</button>
+            </div>
+            <span class="hint" data-gif-length></span>
+          </label>
         </div>
 
         <button type="submit" class="go wide">create</button>
@@ -192,7 +210,7 @@
     <section id="tool-video" class="tool" role="tabpanel" hidden>
       <header class="tool-head">
         <h1>Convert video</h1>
-        <p>Trim, resize, change format and compress, even to an exact file size.</p>
+        <p>Trim, resize, change format, speed it up or reverse it, and compress, even to an exact file size. GIFs too.</p>
       </header>
       <form autocomplete="off">
         <div data-media-source></div>
@@ -228,6 +246,22 @@
               <button type="button" data-value="60">60</button>
               <button type="button" data-value="30">30</button>
               <button type="button" data-value="24">24</button>
+            </div>
+          </label>
+          <label>speed
+            <div class="group" data-key="speed">
+              <button type="button" data-value="0.25">0.25×</button>
+              <button type="button" data-value="0.5">0.5×</button>
+              <button type="button" data-value="1">1×</button>
+              <button type="button" data-value="1.5">1.5×</button>
+              <button type="button" data-value="2">2×</button>
+              <button type="button" data-value="4">4×</button>
+            </div>
+          </label>
+          <label>direction
+            <div class="group" data-key="direction">
+              <button type="button" data-value="forward">forward</button>
+              <button type="button" data-value="reverse" title="Plays it backwards, sound included">reverse</button>
             </div>
           </label>
           <label>audio

@@ -192,7 +192,16 @@ export function createMediaSource(
   player.addEventListener('error', () => {
     if (!file) return;
     sources.file = null;
-    hints.file = ["This browser can't preview this file; type the start and end below.", 'warn'];
+    // A <video> cannot play GIFs; they are still converted whole, or the range typed below.
+    hints.file =
+      file.type === 'image/gif'
+        ? ['GIFs have no preview here: the whole animation is used, unless you type a start and end below.']
+        : ["This browser can't preview this file; type the start and end below.", 'warn'];
+    player.hidden = true;
+    // A range left from the previous file means nothing for this one.
+    form.start.value = '';
+    form.end.value = '';
+    updateLength();
     if (state.source === 'file') showSource();
   });
 
