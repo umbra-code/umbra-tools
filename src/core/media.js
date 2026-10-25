@@ -24,7 +24,8 @@ export async function probeMedia(ctx, file) {
   const audio = streams.find((s) => s.codec_type === 'audio');
 
   let duration = Number(probe.format?.duration);
-  // GIFs do not say how long they are: it is where their last frame ends.
+  // Older ffprobe builds (such as one set with FFMPEG_DIR) do not say how long GIFs are: it is
+  // where their last frame ends.
   if (code === 0 && !Number.isFinite(duration) && probe.format?.format_name === 'gif') {
     duration = await lastFrameEnd(ctx, file);
   }

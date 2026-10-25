@@ -268,7 +268,7 @@ public/                  UI (plain HTML/CSS/JS modules)
   js/crop.js             crop box geometry
   js/viewer.js           zoom and before/after comparison of a result
   js/tools/<tool>.js     one module per tool
-scripts/setup.js         downloads yt-dlp and copies ffmpeg/ffprobe into bin/
+scripts/setup.js         downloads yt-dlp and ffprobe and copies ffmpeg into bin/ (ffmpeg and ffprobe from the same build)
 ```
 
 - Each job works in its own temp folder under `<os temp>/umbra-tools` (`input/`, `work/`, `out/`).
