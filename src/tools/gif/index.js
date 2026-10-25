@@ -5,7 +5,7 @@ import { largestFile, safeFileName, stripExtension } from '../../core/files.js';
 import { ffmpegError, ffmpegProgress, probeMedia } from '../../core/media.js';
 import { formatTime } from '../../core/time.js';
 import { download } from '../downloader/ytdlp.js';
-import { animationLength, buildFfmpegArgs, parseOptions } from './options.js';
+import { animationLength, buildFfmpegArgs, checkLength, parseOptions } from './options.js';
 
 /** Length of the video in seconds; throws when the file has no video stream. */
 async function probeDuration(ctx, file) {
@@ -14,14 +14,19 @@ async function probeDuration(ctx, file) {
   return media.duration;
 }
 
-/** The clip to convert: the uploaded file, or just the selected range of the link. */
+/**
+ * The clip to convert: the uploaded file, or just the selected range of the link.
+ * Also returns how long the clip is (a file without an end is used until its end).
+ */
 async function getSource(ctx) {
-  const { start, end } = ctx.options;
+  const { start, end, speed } = ctx.options;
 
   if (ctx.file) {
     const length = await probeDuration(ctx, ctx.file.path);
     if (start >= length) throw new Error(`The start is past the end of the video (${formatTime(length)})`);
-    return { input: ctx.file.path, name: stripExtension(ctx.file.name), seek: start };
+    const duration = Math.min(end ?? length, length) - start;
+    checkLength(duration, speed);
+    return { input: ctx.file.path, name: stripExtension(ctx.file.name), seek: start, duration };
   }
 
   // Only the selected range is downloaded, cut on exact frames: much faster than the whole video.
@@ -34,7 +39,7 @@ async function getSource(ctx) {
   if (!input) throw new Error('The clip could not be downloaded');
   // "Title [id].mp4" → "Title"
   const name = stripExtension(path.basename(input)).replace(/\s*\[[^\]]+\]$/, '');
-  return { input, name, seek: 0 };
+  return { input, name, seek: 0, duration: end - start };
 }
 
 export default {
@@ -43,11 +48,10 @@ export default {
   parseOptions,
 
   async run(ctx) {
-    const { start, end, format } = ctx.options;
-    const duration = end - start;
-    const length = animationLength(duration, ctx.options);
-    const { input, name, seek } = await getSource(ctx);
+    const { format } = ctx.options;
+    const { input, name, seek, duration } = await getSource(ctx);
     if (ctx.cancelled) return;
+    const length = animationLength(duration, ctx.options);
 
     // ffmpeg reports progress while it writes frames, but a GIF is only written once its
     // palette is ready (at the very end), so its progress is shown as indeterminate. So is

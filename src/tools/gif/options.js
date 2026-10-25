@@ -27,25 +27,34 @@ export const animationLength = (seconds, { speed, direction }) =>
   (seconds / speed) * (direction === 'boomerang' ? 2 : 1);
 
 /**
+ * Throws a 400 unless a clip of `seconds` fits: both the clip and the animation (slowed down,
+ * it lasts longer) are limited to MAX_SECONDS.
+ */
+export function checkLength(seconds, speed) {
+  if (seconds > MAX_SECONDS) throw httpError(400, `Clips can be at most ${MAX_SECONDS} seconds long`);
+  if (seconds / speed > MAX_SECONDS) {
+    throw httpError(400, `At ${speed}× the clip can be at most ${MAX_SECONDS * speed} seconds long`);
+  }
+}
+
+/**
  * Allowed options plus the clip range, in seconds; throws a 400 when the range is invalid.
- * Both the clip and the animation (slowed down, it lasts longer) are limited to MAX_SECONDS.
+ * Links need an end (only that range is downloaded). For files, no end means until the end
+ * (used for GIFs, which have no preview to pick it on); it is checked once their length is known.
  */
 export function parseOptions(body = {}) {
   const options = pickAllowed(body, OPTIONS, DEFAULTS);
   const speed = Number(options.speed);
-  const { start, end } = parseRange(body, { requireEnd: true });
-  if (end - start > MAX_SECONDS) throw httpError(400, `Clips can be at most ${MAX_SECONDS} seconds long`);
-  if ((end - start) / speed > MAX_SECONDS) {
-    throw httpError(400, `At ${speed}× the clip can be at most ${MAX_SECONDS * speed} seconds long`);
-  }
+  const { start, end } = parseRange(body, { requireEnd: Boolean(body.url) });
+  if (end != null) checkLength(end - start, speed);
 
   return { ...options, speed, start, end };
 }
 
 /**
  * The frames of the animation: speed first (so `fps` is the rate of the result), then the
- * size (never upscaled: narrow sources keep their own width), then the direction. A boomerang plays forward and back without repeating the frame
- * where it turns.
+ * size (never upscaled: narrow sources keep their own width), then the direction. A boomerang
+ * plays forward and back without repeating the frame where it turns.
  */
 export function animationFilters({ fps, width, speed = 1, direction = 'forward' }) {
   const frames = [speedVideoFilter(speed), `fps=${fps}`, `scale='min(${width},iw)':-1:flags=lanczos`]

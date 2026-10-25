@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { animationFilters, animationLength, buildFfmpegArgs, DEFAULTS, MAX_SECONDS, parseOptions } from './options.js';
+import {
+  animationFilters,
+  animationLength,
+  buildFfmpegArgs,
+  checkLength,
+  DEFAULTS,
+  MAX_SECONDS,
+  parseOptions,
+} from './options.js';
 
 const lastValue = (args, flag) => args[args.lastIndexOf(flag) + 1];
 
@@ -33,9 +41,20 @@ describe('parseOptions', () => {
   });
 
   it('rejects invalid ranges with a 400', () => {
-    for (const body of [{}, { end: 'soon' }, { start: '-1', end: '5' }, { start: '5', end: '5' }, { start: '8', end: '3' }]) {
+    for (const body of [{ end: 'soon' }, { start: '-1', end: '5' }, { start: '5', end: '5' }, { start: '8', end: '3' }]) {
       expect(() => parseOptions(body)).toThrow(expect.objectContaining({ status: 400 }));
     }
+  });
+
+  it('needs an end for links, but a file without one is used until its end', () => {
+    expect(() => parseOptions({ url: 'https://example.com/v' })).toThrow(expect.objectContaining({ status: 400 }));
+    expect(parseOptions({ start: '2' })).toMatchObject({ start: 2, end: null });
+  });
+
+  it('checks the length the same way once it is known', () => {
+    expect(() => checkLength(MAX_SECONDS, 1)).not.toThrow();
+    expect(() => checkLength(MAX_SECONDS + 1, 1)).toThrow(expect.objectContaining({ status: 400 }));
+    expect(() => checkLength(40, 0.5)).toThrow(/At 0.5×/);
   });
 
   it(`limits clips to ${MAX_SECONDS} seconds`, () => {
