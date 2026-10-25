@@ -86,7 +86,8 @@ npm run update-ytdlp
 ## Video → GIF
 
 Pick a video file (drag and drop works) or paste a link, choose the time range and get a looping
-GIF or animated WebP. Built on ffmpeg.
+GIF or animated WebP. A GIF works as the input too, to speed it up, slow it down, reverse it or make
+it a boomerang. Built on ffmpeg.
 
 | Option | Values                       | Notes                                              |
 |--------|------------------------------|----------------------------------------------------|
@@ -104,6 +105,7 @@ GIF or animated WebP. Built on ffmpeg.
 - For links, the trimmer uses the video's real length and thumbnail; only the selected range is
   downloaded, cut on exact frames.
 - GIFs use a palette built from the clip itself, which gives far better colors than the default one.
+- The browser cannot preview a GIF on the trimmer, so the whole animation is used unless you type a range.
 
 ---
 

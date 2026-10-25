@@ -42,6 +42,9 @@ export function init(section) {
   const media = createMediaSource(form, state, {
     maxLength: MAX_SECONDS,
     defaultLength: 5,
+    // A GIF in: to speed it up, slow it down, reverse it or make it a boomerang.
+    accept: 'video/*,image/gif',
+    label: 'drop a video or a GIF here or click to choose one',
     onRangeChange: (next) => {
       range = next;
       updateLength();
