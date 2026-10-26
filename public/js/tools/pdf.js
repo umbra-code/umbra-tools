@@ -19,10 +19,11 @@ const MODES = {
     submit: 'merge pdfs',
   },
   images: {
-    accept: 'image/*',
+    accept: 'image/*,.heic,.heif',
     label: 'drop images here, or click to choose them',
     multiple: true,
-    isValid: (file) => file.type.startsWith('image/'),
+    // Browsers often give HEIC photos no type at all.
+    isValid: (file) => file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name),
     hint: (n) => `${n} image${n === 1 ? '' : 's'}, one per page, from top to bottom`,
     submit: 'create pdf',
   },

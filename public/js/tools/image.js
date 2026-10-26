@@ -122,6 +122,13 @@ export function init(section) {
             const img = document.createElement('img');
             img.alt = file.name;
             img.src = URL.createObjectURL(file);
+            // No thumbnail for what the browser cannot show (HEIC): its extension instead.
+            img.addEventListener('error', () => {
+              const label = document.createElement('span');
+              label.className = 'thumb-label';
+              label.textContent = (file.name.match(/\.(\w+)$/)?.[1] ?? '?').toUpperCase();
+              img.replaceWith(label);
+            });
             const remove = document.createElement('button');
             remove.type = 'button';
             remove.className = 'remove';
@@ -181,6 +188,7 @@ export function init(section) {
   const editor = createEditor(form, state, {
     onChange: () => schedulePreview(),
     onError: (message) => setHint(message, 'error'),
+    decode: (file) => decodeOnServer(file),
   });
 
   // --- One image: the live result ----------------------------------------------------------------
@@ -234,6 +242,32 @@ export function init(section) {
     previewTimer = setTimeout(renderPreview, PREVIEW_DELAY_MS);
   }
 
+  /** The server's rendering of `file` with `options` (a fetch Response that is ok); throws otherwise. */
+  async function requestPreview(file, options, { signal } = {}) {
+    const request = async (fresh) => {
+      const id = await keptUpload(file, { fresh });
+      return fetch('/api/tools/image/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ upload: id, ...options }),
+        signal,
+      });
+    };
+    let res = await request(false);
+    // The server forgets uploads after a while: send it again once.
+    if (res.status === 404) res = await request(true);
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Error ${res.status}`);
+    return res;
+  }
+
+  /** The picture decoded by the server, for images the browser cannot open itself (HEIC). */
+  async function decodeOnServer(file) {
+    setLive('opening the photo…');
+    const res = await requestPreview(file, { format: 'jpg', quality: '92', metadata: 'remove' });
+    setLive('');
+    return res.blob();
+  }
+
   async function renderPreview() {
     const file = files[0];
     previewAbort?.abort();
@@ -242,22 +276,9 @@ export function init(section) {
     // The original, framed as this request (cropped, rotated, flipped), for the comparison.
     const frame = editor.frame();
 
-    const request = async (fresh) => {
-      const id = await keptUpload(file, { fresh });
-      return fetch('/api/tools/image/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ upload: id, ...options }),
-        signal: abort.signal,
-      });
-    };
-
     try {
       setLive(automatic() ? 'finding the best quality… (big photos take a few seconds)' : 'rendering…');
-      let res = await request(false);
-      // The server forgets uploads after a while: send it again once.
-      if (res.status === 404) res = await request(true);
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Error ${res.status}`);
+      const res = await requestPreview(file, options, { signal: abort.signal });
 
       const meta = JSON.parse(decodeURIComponent(res.headers.get('X-Result')));
       resultBlob = await res.blob();
@@ -375,9 +396,10 @@ export function init(section) {
 
 /**
  * The single-image editor: a canvas preview of the picture rotated and flipped (exactly what
- * the server crops) with a draggable crop box, and the output size.
+ * the server crops) with a draggable crop box, and the output size. `decode(file)` gives a
+ * picture the browser can open (a Blob) for the images it cannot open itself.
  */
-function createEditor(form, state, { onChange, onError }) {
+function createEditor(form, state, { onChange, onError, decode }) {
   const canvas = $('[data-canvas]', form);
   const box = $('[data-box]', form);
   let bitmap = null;
@@ -519,8 +541,13 @@ function createEditor(form, state, { onChange, onError }) {
         // Browsers apply the photo's EXIF orientation here, as the server does.
         opened = await createImageBitmap(file);
       } catch {
-        if (opening === file) onError("This browser can't open that image; try a JPEG, PNG, WebP or AVIF.");
-        return;
+        // Most browsers cannot open HEIC photos: the server decodes them instead.
+        try {
+          opened = await createImageBitmap(await decode(file));
+        } catch (err) {
+          if (opening === file) onError(err.message || "This image can't be opened; try a JPEG, PNG, WebP or AVIF.");
+          return;
+        }
       }
       if (opening !== file) return opened.close(); // another image was picked meanwhile
       bitmap?.close();

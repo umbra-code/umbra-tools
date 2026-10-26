@@ -305,6 +305,17 @@ video.audio-only { height: 54px; background: transparent; }
   border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
+.thumbs .thumb-label {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
 .thumbs .remove {
   position: absolute;
   top: 4px;

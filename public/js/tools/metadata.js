@@ -143,7 +143,8 @@ export function init(section) {
 
   bindDrop($('[data-dropzone]', form), form.file, read);
   bindDrop($('[data-cover-drop]', form), form.cover, (picked) => {
-    if (!picked?.type.startsWith('image/')) return;
+    // Browsers often give HEIC photos no type at all.
+    if (!picked || !(picked.type.startsWith('image/') || /\.(heic|heif)$/i.test(picked.name))) return;
     cover = picked;
     $('[data-cover-label]', form).textContent = `${picked.name} · change`;
   });
