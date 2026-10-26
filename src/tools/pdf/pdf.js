@@ -1,6 +1,7 @@
 // PDF operations with pdf-lib: merge, extract pages and turn images into a PDF.
 import fs from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
+import { readableImage } from '../../core/heic.js';
 import sharp from '../../core/sharp.js';
 import { layoutImage, resolvePages } from './options.js';
 
@@ -40,8 +41,9 @@ export async function extractPages(file, ranges) {
  * The image as JPEG or PNG bytes, the only formats a PDF can embed directly: photos become
  * JPEG, images with transparency PNG. Also turns sideways phone photos upright.
  */
-async function toEmbeddable(file, name) {
+async function toEmbeddable(path, name) {
   try {
+    const file = await readableImage(path);
     const image = sharp(file).rotate();
     const { hasAlpha } = await sharp(file).metadata();
     const { data, info } = await (hasAlpha ? image.png() : image.jpeg({ quality: 92, mozjpeg: true })).toBuffer({

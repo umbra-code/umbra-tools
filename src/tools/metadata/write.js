@@ -1,6 +1,7 @@
 // Writes metadata back: images with sharp, audio and video with ffmpeg (no re-encoding), PDFs with pdf-lib.
 import fs from 'node:fs/promises';
 import { PDFDocument, PDFName } from 'pdf-lib';
+import { readableImage } from '../../core/heic.js';
 import sharp from '../../core/sharp.js';
 import { encoderFor, resolveFormat } from '../image/options.js';
 import { buildXmp, toExifDate } from './fields.js';
@@ -25,10 +26,12 @@ export function exifFor(fields, { keepEmpty = false } = {}) {
  * that) and as XMP (which keeps accents). With `clean`, nothing else is kept (camera, GPS…);
  * otherwise the rest of the EXIF stays and the fields are merged in, while the XMP is replaced.
  * The picture is re-encoded: losslessly for PNG, at high quality for JPEG, WebP and AVIF.
+ * `format` overrides the output format (for HEIC photos, which cannot be written back).
  */
-export async function writeImage(input, output, { fields, clean }) {
+export async function writeImage(source, output, { fields, clean, format: forced = null }) {
+  const input = await readableImage(source);
   const info = await sharp(input).metadata();
-  const format = resolveFormat(info, 'original');
+  const format = forced ?? resolveFormat(info, 'original');
   const animated = (info.pages ?? 1) > 1 && ['webp', 'gif'].includes(format);
 
   let image = sharp(input, { animated }).rotate();

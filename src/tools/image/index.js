@@ -4,8 +4,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { httpError } from '../../core/errors.js';
 import { stripExtension } from '../../core/files.js';
+import { readableImage } from '../../core/heic.js';
 import { convertImage, describeImageError, renderImage } from './convert.js';
 import { EXTENSIONS, hasEdits, MIME_TYPES, parseOptions } from './options.js';
+
+// The last previewed upload, ready for sharp: a HEIC photo takes about a second to decode, and
+// the editor previews the same one again on every change. One is enough, since it edits one image.
+let lastReadable = { path: null, image: null };
+
+function readableUpload(upload) {
+  if (lastReadable.path !== upload.path) {
+    const image = readableImage(upload.path);
+    lastReadable = { path: upload.path, image };
+    // A failed decode is not kept: the next preview tries again.
+    image.catch(() => lastReadable.image === image && (lastReadable = { path: null, image: null }));
+  }
+  return lastReadable.image;
+}
 
 export default {
   id: 'image',
@@ -20,10 +35,10 @@ export default {
   async preview(upload, options, { signal } = {}) {
     let result;
     try {
-      result = await renderImage(upload.path, options, { signal });
+      result = await renderImage(await readableUpload(upload), options, { signal });
     } catch (err) {
       if (signal?.aborted) throw err;
-      throw httpError(422, describeImageError(err, upload.name));
+      throw httpError(422, describeImageError(err));
     }
     const { data, format, width, height, quality, scale } = result;
     return {
@@ -57,7 +72,7 @@ export default {
         results.push({ name: file.name, output: path.basename(output), size: fs.statSync(output).size, width, height, quality, scale });
       } catch (err) {
         ctx.log(`${file.name}: ${err.message}`);
-        results.push({ name: file.name, error: describeImageError(err, file.name) });
+        results.push({ name: file.name, error: describeImageError(err) });
       }
       ctx.progress((i + 1) / ctx.files.length);
       ctx.set({ results });

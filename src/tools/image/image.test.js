@@ -328,7 +328,22 @@ describe('convertImage', () => {
     fs.writeFileSync(input, 'not an image');
     const err = await convertImage(input, 'notes.txt', out, options).catch((e) => e);
     expect(err).toBeInstanceOf(Error);
-    expect(describeImageError(err, 'notes.txt')).toBe('Not an image this tool can read');
-    expect(describeImageError(err, 'IMG_0001.HEIC')).toMatch(/HEIC/);
+    expect(describeImageError(err)).toBe('Not an image this tool can read');
+  });
+
+  it('converts and edits HEIC photos, keeping their EXIF when asked', async () => {
+    const heic = path.join(import.meta.dirname, '../../core/fixtures/quadrants.heic');
+    const kept = await convertImage(heic, 'IMG_0001.HEIC', out, { ...options, format: 'jpg', metadata: 'keep' });
+    expect(path.basename(kept.output)).toBe('IMG_0001.jpg');
+    expect([kept.width, kept.height]).toEqual([64, 48]);
+    expect((await sharp(kept.output).metadata()).exif?.toString('latin1')).toContain('TestCam');
+
+    // Cropped to the top-right quadrant, which is green.
+    const crop = { left: 32, top: 0, width: 32, height: 24 };
+    const edited = await renderImage(heic, { ...options, format: 'png', crop });
+    const [r, g, b] = (await sharp(edited.data).raw().toBuffer()).subarray(0, 3);
+    expect([edited.width, edited.height]).toEqual([32, 24]);
+    expect(g).toBeGreaterThan(200);
+    expect(r + b).toBeLessThan(60);
   });
 });

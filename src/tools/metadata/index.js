@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { BINARIES } from '../../core/paths.js';
 import { safeFileName, stripExtension } from '../../core/files.js';
+import { isHeic, readableImage } from '../../core/heic.js';
 import { ffmpegError } from '../../core/media.js';
 import sharp from '../../core/sharp.js';
 import { buildMediaArgs, fieldsFor, parseOptions } from './fields.js';
@@ -13,7 +14,8 @@ import { writeImage, writePdf } from './write.js';
 async function prepareCover(cover, dir) {
   const target = path.join(dir, 'cover.jpg');
   try {
-    await sharp(cover.path).rotate().resize(1200, 1200, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toFile(target);
+    await sharp(await readableImage(cover.path))
+      .rotate().resize(1200, 1200, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toFile(target);
   } catch (err) {
     throw new Error(`${cover.name} is not an image this tool can read`, { cause: err });
   }
@@ -32,7 +34,9 @@ export default {
     const kind = await detectKind(file.path);
     if (!kind) throw new Error('This is not an image, audio, video or PDF file this tool can read');
 
-    const ext = path.extname(file.name).slice(1).toLowerCase();
+    // HEIC cannot be written back: those photos come out as high-quality JPEG.
+    const heic = kind === 'image' && (await isHeic(file.path));
+    const ext = heic ? 'jpg' : path.extname(file.name).slice(1).toLowerCase();
     if (!ext) throw new Error('The file needs an extension (like .mp3 or .jpg) to be rewritten');
     const output = path.join(ctx.outDir, `${safeFileName(stripExtension(file.name), 'file')}.${ext}`);
     const fields = fieldsFor(kind, options.fields);
@@ -40,7 +44,7 @@ export default {
     ctx.set({ attempt: 0 });
     ctx.stage('converting');
 
-    if (kind === 'image') return writeImage(file.path, output, { fields, clean });
+    if (kind === 'image') return writeImage(file.path, output, { fields, clean, format: heic ? 'jpg' : null });
     if (kind === 'pdf') return writePdf(file.path, output, { fields, clean });
 
     let coverPath = null;

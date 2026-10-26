@@ -1,7 +1,7 @@
 // Renders one image with sharp: orient, edit (rotate, flip, crop, resize), encode — at a
 // chosen quality, or at the best quality that fits a maximum weight.
 import fs from 'node:fs';
-import path from 'node:path';
+import { readableImage } from '../../core/heic.js';
 import sharp from '../../core/sharp.js';
 import { safeFileName, stripExtension, uniquePath } from '../../core/files.js';
 import {
@@ -28,8 +28,10 @@ const MIN_SIDE = 16;
  * two, so the crop means exactly what the preview showed: first the picture is turned upright
  * (EXIF), rotated and flipped; then the crop and the resize apply to that result.
  */
-async function prepare(input, options) {
+async function prepare(source, options) {
   const { format, maxSize, metadata, rotate, flipH, flipV, crop, width, height } = options;
+  // HEIC photos are decoded first (into a PNG with their EXIF); other images go as they are.
+  const input = await readableImage(source);
   const info = await sharp(input).metadata();
   const outFormat = resolveFormat(info, format);
   const keep = metadata === 'keep';
@@ -261,9 +263,7 @@ export async function convertImage(input, name, outDir, options) {
 }
 
 /** A message for the user when sharp cannot read or write an image. */
-export function describeImageError(err, name) {
+export function describeImageError(err) {
   const unsupported = /unsupported image format|bad seek|Input file contains unsupported/i.test(err.message);
-  const ext = path.extname(name).toLowerCase();
-  if (['.heic', '.heif'].includes(ext)) return 'HEIC photos are not supported yet; export them as JPEG first';
   return unsupported ? 'Not an image this tool can read' : err.message;
 }
