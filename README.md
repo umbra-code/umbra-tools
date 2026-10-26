@@ -20,7 +20,7 @@ Ideas and order are not set in stone; see [Roadmap](#roadmap).
 
 ## Getting started
 
-Requires Node.js 20 or newer.
+Requires Node.js 20.15 or newer.
 
 ```sh
 npm install   # installs dependencies and downloads yt-dlp, ffmpeg and ffprobe into bin/
@@ -187,7 +187,10 @@ and png.
 - Phone photos stored sideways are turned upright using their EXIF orientation.
 - Transparent areas become white when converting to jpg, which has no transparency.
 - Animated GIFs stay animated as webp (unless edited); other formats keep the first frame.
-- A file that cannot be read does not stop the others. HEIC photos (iPhone) are not supported yet.
+- A file that cannot be read does not stop the others.
+- **HEIC photos** (the iPhone default) work everywhere images do: here, in images → PDF and in Metadata. Most
+  browsers cannot show them, so the server decodes them for the editor (about a second for a 12 MP photo) and
+  batch thumbnails show "HEIC" instead. HEIC cannot be written back, so "same format" gives PNG.
 
 ---
 
@@ -226,8 +229,9 @@ Drop an image, audio, video or PDF to see what it says about itself, then edit i
 - **Clean**: "everything else → remove" keeps only those fields and drops the rest.
 - **Cover**: keep, remove or replace the cover image of mp3, m4a and flac files.
 - Audio and video are rewritten **without re-encoding**. PDFs lose their old details for real (they are deleted
-  from the file, not just unlinked). Images are re-encoded in their own format (PNG losslessly) and their
-  fields are written as both EXIF and XMP, so accents survive.
+  from the file, not just unlinked). Images are re-encoded in their own format (PNG losslessly; HEIC photos,
+  which cannot be written back, as high-quality JPEG) and their fields are written as both EXIF and XMP, so
+  accents survive.
 - On purpose, the location can only be seen and removed, never written: making one up is the easiest way to use
   this tool to deceive. Editing metadata is legal; using it to pass off someone else's work as yours or to fake
   evidence is not, and is on whoever does it.
@@ -250,6 +254,7 @@ src/core/                shared by every tool
   media.js               ffprobe and ffmpeg helpers (what a file contains, progress, errors)
   archive.js             zips the results of jobs that produce several files
   sharp.js               sharp, configured for this app (import it from here)
+  heic.js                decodes HEIC photos (libheif in WebAssembly, in a worker thread) for sharp
   files.js, time.js      file names, time parsing
   paths.js               binaries and temp locations
 src/tools/               one folder per tool
@@ -361,6 +366,7 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Images: editor (crop, rotate, flip, size) with a live result, zoom and compare
 - [x] Images: fit a file size (automatic quality)
 - [x] GIF / video extras: speed, reverse, boomerang, GIF → MP4
+- [x] HEIC photos (iPhone) in every tool that takes images
 - [x] PDF: merge, images → PDF, extract pages
 - [x] Metadata: read, edit and clean
 - [x] Downloader: playlists
