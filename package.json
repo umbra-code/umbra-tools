@@ -6,7 +6,7 @@
   "description": "Self-hosted toolbox for media and file tasks, built on yt-dlp and ffmpeg",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.15"
   },
   "scripts": {
     "postinstall": "node scripts/setup.js",
@@ -23,6 +23,7 @@
     "exif-reader": "^2.0.3",
     "express": "^5.1.0",
     "ffmpeg-static": "^5.2.0",
+    "heic-decode": "^2.1.0",
     "multer": "^2.4.0",
     "pdf-lib": "^1.17.1",
     "sharp": "^0.35.5",
