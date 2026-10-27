@@ -4,6 +4,8 @@ A self-hosted toolbox for everyday media and file tasks: downloading, converting
 transforming video, audio, images and documents, all from one local web app.
 Everything runs on your machine, so files never leave it and there are no upload limits.
 
+![The Images tool: a photo cropped to 16:9 in the editor, with the live result below it, converted to WebP and 81% smaller](docs/screenshot.png)
+
 ## Tools
 
 | Tool | Status | Description |
