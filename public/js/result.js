@@ -21,6 +21,8 @@ function describe(job) {
       return `converting${pass}${pct || '…'}`;
     case 'reversing':
       return `reversing${pct || '…'}`;
+    case 'reading':
+      return `reading the text${pct || '…'}`;
     case 'packing':
       return 'packing the zip…';
     default:

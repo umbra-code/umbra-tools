@@ -227,6 +227,27 @@ button, .actions a {
   border-color: var(--accent);
 }
 
+/* A lone button that looks like the ones in a group. */
+.chip {
+  background: var(--surface);
+  color: var(--muted);
+  border-color: var(--border);
+  padding: 6px 13px;
+  font-size: 0.9rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+.chip:hover { color: var(--text); border-color: var(--border-strong); }
+
+kbd {
+  font: inherit;
+  font-size: 0.85em;
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  color: var(--text);
+}
+
 .options { display: flex; flex-direction: column; gap: 14px; }
 .options label, .range label {
   display: flex;
@@ -330,6 +351,65 @@ video.audio-only { height: 54px; background: transparent; }
   line-height: 1;
 }
 .thumbs .remove:hover { background: rgb(0 0 0 / 0.85); }
+
+/* Text from image: options under the drop zone, then one card per image read. */
+.ocr-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.when-touch { display: none; }
+@media (hover: none) and (pointer: coarse) {
+  .when-keyboard { display: none; }
+  .when-touch { display: inline; }
+}
+.ocr-results { display: flex; flex-direction: column; gap: 14px; }
+.ocr-results:empty { display: none; }
+.ocr-card {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.ocr-thumb {
+  width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  object-position: top;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.ocr-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ocr-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ocr-name {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.ocr-text {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.ocr-text:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ocr-card .hint { margin: 0; }
+.ocr-all { align-self: flex-end; }
 
 /* PDF tool: files as ordered rows. */
 .file-rows {
@@ -836,6 +916,8 @@ textarea {
 
   .nav { flex-direction: row; justify-content: space-between; }
   .nav-item {
+    flex: 1 1 0;
+    min-width: 0;
     flex-direction: column;
     gap: 3px;
     padding: 6px 2px;
@@ -850,6 +932,8 @@ textarea {
 }
 
 @media (max-width: 480px) {
+  .ocr-card { grid-template-columns: minmax(0, 1fr); }
+  .ocr-thumb { max-height: 120px; object-position: center; }
   .meta-fields { grid-template-columns: minmax(0, 1fr); }
   .meta-label { flex-basis: 96px; }
   .preview .thumb { width: 96px; }

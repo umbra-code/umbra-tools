@@ -39,6 +39,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 export async function pollJob(id, { onUpdate, onOffline, signal }) {
   let networkErrors = 0;
+  // Quick jobs (reading a screenshot) finish in a fraction of a second: ask soon at first,
+  // then settle at 600 ms.
+  let wait = 150;
   while (!signal.aborted) {
     let job;
     try {
@@ -58,7 +61,8 @@ export async function pollJob(id, { onUpdate, onOffline, signal }) {
     if (job.status === 'error') throw new Error(job.error);
     if (job.status === 'cancelled') break;
     onUpdate(job);
-    await sleep(600);
+    await sleep(wait);
+    wait = Math.min(600, wait * 2);
   }
   throw new DOMException('cancelled', 'AbortError');
 }
