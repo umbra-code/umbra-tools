@@ -4,9 +4,10 @@ import downloader from './downloader/index.js';
 import gif from './gif/index.js';
 import image from './image/index.js';
 import metadata from './metadata/index.js';
+import ocr from './ocr/index.js';
 import pdf from './pdf/index.js';
 import video from './video/index.js';
 
 export const tools = Object.fromEntries(
-  [downloader, gif, video, audio, image, pdf, metadata].map((tool) => [tool.id, tool]),
+  [downloader, gif, video, audio, image, ocr, pdf, metadata].map((tool) => [tool.id, tool]),
 );
