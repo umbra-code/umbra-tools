@@ -15,6 +15,7 @@ Everything runs on your machine, so files never leave it and there are no upload
 | [Video converter](#video-converter) | ✅ available | Trim, resize, change format/codec, speed or direction and compress, also to a target file size; GIF → MP4 |
 | [Audio converter](#audio-converter) | ✅ available | Convert, trim, downmix and normalize audio, or extract it from a video |
 | [Images](#images) | ✅ available | Crop, rotate, resize and convert an image with a live result, or many at once; fit them to a file size |
+| [Text from image](#text-from-image) | ✅ available | Paste a screenshot or drop a photo and copy the text in it (OCR) |
 | [PDF](#pdf) | ✅ available | Merge PDFs, turn images into a PDF, extract pages |
 | [Metadata](#metadata) | ✅ available | See what a file says about you (like its location), edit it or clean it |
 
@@ -196,6 +197,26 @@ and png.
 
 ---
 
+## Text from image
+
+Paste a screenshot with Ctrl + V (or drop or pick images) and the text in it shows up, ready to copy.
+Built on [Tesseract](https://github.com/tesseract-ocr/tesseract) through [tesseract.js](https://tesseract.projectnaptha.com/)
+(WebAssembly), with its language models installed as npm packages: nothing else to install and nothing
+sent anywhere.
+
+| Option   | Values                              | Notes                                                 |
+|----------|-------------------------------------|-------------------------------------------------------|
+| language | español + english, español, english | Both at once read text mixing the two                 |
+
+- It starts reading as soon as there is an image; a screenshot takes well under a second.
+- Each image gets its text in a box you can fix before copying, plus "copy all" for several and a `.txt` download.
+- Screenshots in dark mode work too, and small text is enlarged first, which Tesseract reads far better.
+- Best with screenshots and photos of printed text; handwriting is beyond it. When it was unsure about much of
+  the text, it says so.
+- On phones, "paste from clipboard" reads a copied image (where the browser allows it), and the picker can take a photo.
+
+---
+
 ## PDF
 
 Simple PDF tasks, built on [pdf-lib](https://pdf-lib.js.org/). Everything happens on your machine.
@@ -266,6 +287,7 @@ src/tools/               one folder per tool
   video/                 video converter
   audio/                 audio converter
   image/                 image editor and converter, fit a size (sharp)
+  ocr/                   text from image (tesseract.js)
   pdf/                   PDF tools (pdf-lib)
   metadata/              metadata reader and editor (exif-reader, sharp, ffmpeg, pdf-lib)
 public/                  UI (plain HTML/CSS/JS modules)
@@ -293,6 +315,7 @@ scripts/setup.js         downloads yt-dlp and ffprobe and copies ffmpeg into bin
   - `audio`: `start`, `end`, `format`, `bitrate`, `channels`, `normalize`
   - `image`: `format`, `quality` (1–100 or `auto` with `maxKb`), `maxSize`, `metadata` (one or more files);
     for one file also `rotate`, `flipH`, `flipV`, `cropX`, `cropY`, `cropWidth`, `cropHeight`, `width`, `height`
+  - `ocr`: `lang` (`spa+eng`, `spa`, `eng`) (one or more files); each image's `text` and `confidence` come in `results`
   - `pdf`: `mode` (`merge`, `images`, `extract`), `pageSize`, `pages` (several files)
   - `metadata`: `fields` (JSON object), `clean` (`on`, `off`), `cover` (`keep`, `remove`, `replace` with a `cover` file)
 - `GET /api/jobs/:id` → `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage` and `progress`
@@ -369,6 +392,7 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit while it waits for CI.
 - [x] Images: fit a file size (automatic quality)
 - [x] GIF / video extras: speed, reverse, boomerang, GIF → MP4
 - [x] HEIC photos (iPhone) in every tool that takes images
+- [x] Text from image (OCR)
 - [x] PDF: merge, images → PDF, extract pages
 - [x] Metadata: read, edit and clean
 - [x] Downloader: playlists
